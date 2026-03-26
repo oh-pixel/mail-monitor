@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mail Monitor</title>
+<script src="msal-browser.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f10;--s1:#18181b;--s2:#222226;--s3:#2a2a2f;
+  --b1:rgba(255,255,255,0.07);--b2:rgba(255,255,255,0.13);--b3:rgba(255,255,255,0.2);
+  --t1:#e8e8ea;--t2:#9b9ba2;--t3:#6b6b72;
+  --ok:#22c55e;--ok-d:rgba(34,197,94,0.12);--ok-b:rgba(34,197,94,0.3);
+  --wa:#f59e0b;--wa-d:rgba(245,158,11,0.12);--wa-b:rgba(245,158,11,0.3);
+  --er:#ef4444;--er-d:rgba(239,68,68,0.12);--er-b:rgba(239,68,68,0.3);
+  --ac:#6366f1;--ac-d:rgba(99,102,241,0.15);
+  --r:10px;--rl:14px;
+  --font:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+}
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+body{font-family:var(--font);background:var(--bg);color:var(--t1);min-height:100vh;font-size:14px;line-height:1.5}
+a{color:inherit;text-decoration:none}
+button{font-family:var(--font);cursor:pointer}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:100;background:rgba(15,15,16,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--b1);padding:12px 28px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:14px;color:var(--t1);letter-spacing:-0.02em}
+.logo-dot{width:7px;height:7px;border-radius:50%;background:var(--ac)}
+.hright{display:flex;align-items:center;gap:10px}
+.upill{display:flex;align-items:center;gap:7px;padding:5px 13px;background:var(--s1);border:1px solid var(--b1);border-radius:20px;font-size:12px;color:var(--t3)}
+.udot{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.btn{padding:7px 16px;border-radius:var(--r);border:1px solid var(--b2);font-size:12px;color:var(--t2);background:transparent;transition:all .15s}
+.btn:hover{background:var(--s2);color:var(--t1)}
+.btn.prim{background:var(--ac);color:#fff;border-color:var(--ac)}
+.btn.prim:hover{background:#5254cc}
+.btn.danger{border-color:var(--er-b);color:var(--er)}
+.btn.danger:hover{background:var(--er-d)}
+
+/* NAV TABS */
+.nav{display:flex;border-bottom:1px solid var(--b1);background:var(--s1);padding:0 28px}
+.ntab{padding:12px 18px;font-size:13px;color:var(--t3);border-bottom:2px solid transparent;cursor:pointer;background:none;border-top:none;border-left:none;border-right:none;transition:all .15s}
+.ntab:hover{color:var(--t1)}
+.ntab.active{color:var(--t1);border-bottom-color:var(--ac)}
+.ntab .nbadge{display:inline-flex;align-items:center;justify-content:center;margin-left:6px;padding:1px 6px;border-radius:20px;font-size:10px;background:var(--er-d);color:var(--er);font-family:var(--mono)}
+
+/* MAIN */
+main{padding:24px 28px;max-width:1400px;margin:0 auto}
+
+/* LOGIN */
+#v-login{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;gap:20px;text-align:center}
+.login-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:44px 52px;max-width:420px;width:100%}
+.login-icon{width:52px;height:52px;background:var(--ac-d);border-radius:13px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.login-card h2{font-size:19px;font-weight:500;margin-bottom:8px;letter-spacing:-0.02em}
+.login-card p{font-size:13px;color:var(--t3);margin-bottom:26px;line-height:1.7}
+.ms-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px 18px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.ms-btn:hover{background:var(--s3);border-color:var(--b3)}
+.cfg-hint{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:14px 18px;font-size:11px;color:var(--t3);font-family:var(--mono);text-align:left;line-height:1.9;max-width:420px;width:100%}
+.cfg-hint strong{color:var(--t1);font-weight:500}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap}
+.tl{display:flex;align-items:center;gap:8px}
+select{background:var(--s1);border:1px solid var(--b2);color:var(--t1);font-family:var(--font);font-size:12px;padding:7px 28px 7px 11px;border-radius:var(--r);appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%236b6b72' d='M5 7L1 3h8z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;cursor:pointer}
+select:focus{outline:none;border-color:var(--ac)}
+.sync-lbl{font-size:11px;color:var(--t3);font-family:var(--mono)}
+
+/* STAT CARDS */
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px}
+.sc{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:16px 18px;position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0}
+.sc.c-tot::before{background:var(--ac)}
+.sc.c-ok::before{background:var(--ok)}
+.sc.c-wa::before{background:var(--wa)}
+.sc.c-er::before{background:var(--er)}
+.sc.c-mis::before{background:#a855f7}
+.slbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:6px}
+.sval{font-size:28px;font-weight:300;font-family:var(--mono);letter-spacing:-.02em}
+.sc.c-tot .sval{color:var(--t1)}
+.sc.c-ok .sval{color:var(--ok)}
+.sc.c-wa .sval{color:var(--wa)}
+.sc.c-er .sval{color:var(--er)}
+.sc.c-mis .sval{color:#a855f7}
+.ssub{font-size:10px;color:var(--t3);margin-top:3px}
+
+/* CHARTS */
+.charts-row{display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:22px}
+.cc{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:18px 20px}
+.ctitle{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:14px}
+.chart-wrap{position:relative;height:180px;display:flex;align-items:center;justify-content:center}
+
+/* MAIL TABLE */
+.mc{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);overflow:hidden}
+.mc-head{padding:12px 18px;border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ftabs{display:flex;gap:3px}
+.ft{padding:5px 13px;border-radius:20px;font-size:11px;border:1px solid transparent;color:var(--t3);background:transparent;cursor:pointer;transition:all .15s}
+.ft:hover{color:var(--t1)}
+.ft.a{background:var(--s2);border-color:var(--b2);color:var(--t1)}
+.ft.ok.a{background:var(--ok-d);border-color:var(--ok-b);color:var(--ok)}
+.ft.wa.a{background:var(--wa-d);border-color:var(--wa-b);color:var(--wa)}
+.ft.er.a{background:var(--er-d);border-color:var(--er-b);color:var(--er)}
+.ft.mis.a{background:rgba(168,85,247,0.12);border-color:rgba(168,85,247,0.3);color:#a855f7}
+.search-inp{padding:6px 11px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-size:12px;width:200px}
+.search-inp:focus{outline:none;border-color:var(--ac)}
+.mrow{display:grid;grid-template-columns:8px 140px 1fr auto auto;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--b1);transition:background .1s}
+.mrow:last-child{border-bottom:none}
+.mrow:hover{background:var(--s2)}
+.mind{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.mind.ok{background:var(--ok)}
+.mind.wa{background:var(--wa)}
+.mind.er{background:var(--er)}
+.mind.mis{background:#a855f7}
+.mind.un{background:var(--t3)}
+.mcust{font-size:11px;font-family:var(--mono);color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msubj{font-size:12px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msend{font-size:10px;color:var(--t3);margin-top:2px}
+.mbadge{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:500;white-space:nowrap}
+.b-ok{background:var(--ok-d);color:var(--ok)}
+.b-wa{background:var(--wa-d);color:var(--wa)}
+.b-er{background:var(--er-d);color:var(--er)}
+.b-mis{background:rgba(168,85,247,0.12);color:#a855f7}
+.b-un{background:rgba(255,255,255,0.05);color:var(--t3)}
+.mdate{font-size:10px;color:var(--t3);font-family:var(--mono);white-space:nowrap}
+.mrow-miss{background:rgba(168,85,247,0.04);border-left:2px solid rgba(168,85,247,0.4)}
+.mcnt{font-size:11px;color:var(--t3);font-family:var(--mono)}
+
+/* CUSTOMER VIEW */
+.cust-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.cust-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.cust-card{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:16px 18px;transition:border-color .15s}
+.cust-card:hover{border-color:var(--b2)}
+.cust-card.has-miss{border-color:rgba(168,85,247,0.35);background:rgba(168,85,247,0.04)}
+.cust-card.has-err{border-color:var(--er-b)}
+.cc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.cc-name{font-size:13px;font-weight:500;color:var(--t1)}
+.cc-kw{font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:2px}
+.cc-status{display:flex;gap:5px;align-items:center}
+.cc-dot{width:8px;height:8px;border-radius:50%}
+.cc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+.cc-stat{background:var(--s2);border-radius:6px;padding:8px 10px;text-align:center}
+.cc-stat-val{font-size:16px;font-weight:400;font-family:var(--mono)}
+.cc-stat-lbl{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.cc-footer{display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--t3)}
+.miss-pill{padding:3px 9px;border-radius:20px;background:rgba(168,85,247,0.12);color:#a855f7;font-size:10px;font-weight:500}
+.cc-actions{display:flex;gap:6px}
+.icon-btn{background:none;border:none;color:var(--t3);font-size:13px;padding:3px 5px;border-radius:5px;transition:all .15s}
+.icon-btn:hover{background:var(--s2);color:var(--t1)}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:200;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl);padding:28px 32px;max-width:520px;width:90%;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:16px;font-weight:500;margin-bottom:20px;letter-spacing:-.01em}
+.fg{margin-bottom:14px}
+label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:5px}
+input[type=text],input[type=number],textarea{width:100%;padding:8px 11px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-family:var(--mono);font-size:12px}
+input:focus,textarea:focus{outline:none;border-color:var(--ac)}
+textarea{resize:vertical;min-height:70px;line-height:1.6}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mfooter{display:flex;gap:8px;justify-content:flex-end;margin-top:22px}
+.form-hint{font-size:11px;color:var(--t3);margin-top:4px;line-height:1.5}
+.days-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:6px}
+.day-cb{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;color:var(--t3);cursor:pointer}
+.day-cb input{width:14px;height:14px;cursor:pointer;accent-color:var(--ac)}
+
+/* EMPTY / LOADING */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;gap:10px;color:var(--t3);font-size:12px}
+.spinner{width:18px;height:18px;border:2px solid var(--b2);border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;right:22px;padding:11px 16px;border-radius:var(--r);font-size:12px;z-index:300;display:none;max-width:340px}
+.toast.err{background:var(--er-d);border:1px solid var(--er-b);color:var(--er)}
+.toast.suc{background:var(--ok-d);border:1px solid var(--ok-b);color:var(--ok)}
+.toast.show{display:block;animation:fi .2s}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* SETTINGS TAB */
+.kw-section{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px}
+.kw-col{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:16px 18px}
+.kw-col-title{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:500;margin-bottom:12px}
+.t-ok{color:var(--ok)}.t-wa{color:var(--wa)}.t-er{color:var(--er)}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px}
+@media(max-width:900px){.stats{grid-template-columns:repeat(3,1fr)}.charts-row{grid-template-columns:1fr}main{padding:16px}}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo"><div class="logo-dot"></div>mail monitor</div>
+  <div class="hright">
+    <div class="upill" id="upill" style="display:none"><div class="udot"></div><span id="uname">–</span></div>
+    <button class="btn" id="btn-cfg" data-tab="'settings')" style="display:none">Einstellungen</button>
+    <button class="btn" id="btn-logout" id="btn-logout-el" style="display:none">Abmelden</button>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav" id="main-nav" style="display:none">
+  <button class="ntab active" data-tab="'dashboard',this)">Dashboard</button>
+  <button class="ntab" data-tab="'customers',this)">Kunden <span class="nbadge" id="miss-badge" style="display:none">0</span></button>
+  <button class="ntab" data-tab="'mails',this)">E-Mails</button>
+  <button class="ntab" data-tab="'settings',this)">Einstellungen</button>
+</div>
+
+<main>
+
+<!-- LOGIN -->
+<div id="v-login">
+  <div class="login-card">
+    <div class="login-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8l10 6 10-6"/></svg>
+    </div>
+    <h2>Mail Monitor</h2>
+    <p>Verbinde dein Microsoft 365 Konto um E-Mail-Benachrichtigungen automatisch nach Kunde und Status auszuwerten.</p>
+    <button class="ms-btn" id="ms-login-btn">
+      <svg width="18" height="18" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      Mit Microsoft 365 anmelden
+    </button>
+  </div>
+  <div class="cfg-hint">
+    <strong>Vor dem Login:</strong> CLIENT_ID in dieser Datei eintragen.<br>
+    Redirect-URI im Azure Portal: <span style="color:var(--ac)" id="hint-uri">–</span>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="v-dashboard" style="display:none">
+  <div class="toolbar">
+    <div class="tl">
+      <select id="sel-period" onchange="reload()">
+        <option value="1">Heute</option>
+        <option value="7" selected>Letzte 7 Tage</option>
+        <option value="14">Letzte 14 Tage</option>
+        <option value="30">Letzte 30 Tage</option>
+      </select>
+      <select id="sel-folder" onchange="reload()">
+        <option value="inbox">Posteingang</option>
+        <option value="allMessages">Alle Ordner</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="sync-lbl" id="sync-lbl">–</span>
+      <button class="btn prim" onclick="reload()" id="rbtn">↻ Aktualisieren</button>
+    </div>
+  </div>
+  <div class="stats" id="stats-row"></div>
+  <div class="charts-row">
+    <div class="cc"><div class="ctitle">Verteilung</div><div class="chart-wrap"><canvas id="c-donut"></canvas></div></div>
+    <div class="cc"><div class="ctitle">Verlauf (täglich)</div><div class="chart-wrap"><canvas id="c-bar"></canvas></div></div>
+  </div>
+  <div class="mc">
+    <div class="mc-head">
+      <div class="ftabs" id="dash-ftabs">
+        <button class="ft a" onclick="setDashFilter('all',this)">Alle</button>
+        <button class="ft ok" onclick="setDashFilter('ok',this)">Erfolgreich</button>
+        <button class="ft wa" onclick="setDashFilter('wa',this)">Warnungen</button>
+        <button class="ft er" onclick="setDashFilter('er',this)">Fehler</button>
+        <button class="ft mis" onclick="setDashFilter('missing',this)">Fehlend</button>
+      </div>
+      <span class="mcnt" id="dash-cnt">–</span>
+    </div>
+    <div id="dash-list"></div>
+  </div>
+</div>
+
+<!-- CUSTOMERS -->
+<div id="v-customers" style="display:none">
+  <div class="cust-toolbar">
+    <span style="font-size:13px;color:var(--t2)" id="cust-summary">–</span>
+    <button class="btn prim" onclick="openCustModal()">+ Kunde hinzufügen</button>
+  </div>
+  <div class="cust-grid" id="cust-grid"></div>
+</div>
+
+<!-- MAILS -->
+<div id="v-mails" style="display:none">
+  <div class="toolbar">
+    <div class="tl">
+      <div class="ftabs" id="mail-ftabs">
+        <button class="ft a" onclick="setMailFilter('all',this)">Alle</button>
+        <button class="ft ok" onclick="setMailFilter('ok',this)">Erfolgreich</button>
+        <button class="ft wa" onclick="setMailFilter('wa',this)">Warnungen</button>
+        <button class="ft er" onclick="setMailFilter('er',this)">Fehler</button>
+        <button class="ft mis" onclick="setMailFilter('missing',this)">Fehlend</button>
+      </div>
+    </div>
+    <input class="search-inp" type="text" placeholder="Betreff / Kunde suchen..." id="mail-search" oninput="renderMailList()">
+  </div>
+  <div class="mc">
+    <div class="mc-head" style="border-bottom:none;padding-bottom:0">
+      <span class="mcnt" id="mail-cnt">–</span>
+    </div>
+    <div id="mail-list"></div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="v-settings" style="display:none">
+  <div style="margin-bottom:20px;font-size:13px;color:var(--t2)">Keywords zur Klassifizierung der Betreffzeilen</div>
+  <div class="kw-section">
+    <div class="kw-col"><div class="kw-col-title t-ok">Erfolgreich</div><textarea id="s-ok" placeholder="Erfolgreich, Success, OK..." rows="4"></textarea><div class="form-hint">Kommagetrennte Keywords</div></div>
+    <div class="kw-col"><div class="kw-col-title t-wa">Wichtige Warnungen</div><textarea id="s-wa" placeholder="Warnung, Warning, Wichtig..." rows="4"></textarea><div class="form-hint">Kommagetrennte Keywords</div></div>
+    <div class="kw-col"><div class="kw-col-title t-er">Fehler</div><textarea id="s-er" placeholder="Fehler, Error, Failed..." rows="4"></textarea><div class="form-hint">Kommagetrennte Keywords</div></div>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn prim" onclick="saveSettings()">Einstellungen speichern</button>
+    <button class="btn" onclick="reload()">Neu auswerten</button>
+  </div>
+</div>
+
+</main>
+
+<!-- CUSTOMER MODAL -->
+<div class="overlay" id="cust-overlay">
+  <div class="modal">
+    <h3 id="cust-modal-title">Kunde hinzufügen</h3>
+    <div class="two-col">
+      <div class="fg">
+        <label>Kundenname *</label>
+        <input type="text" id="c-name" placeholder="Musterfirma AG">
+        <div class="form-hint">Muss im Betreff vorkommen</div>
+      </div>
+      <div class="fg">
+        <label>Kürzel / Alias (optional)</label>
+        <input type="text" id="c-alias" placeholder="MUSTER">
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="fg">
+        <label>Erwartete E-Mails pro Zeitfenster *</label>
+        <input type="number" id="c-count" min="1" value="1">
+      </div>
+      <div class="fg">
+        <label>Zeitfenster</label>
+        <select id="c-window" style="width:100%">
+          <option value="day">Täglich</option>
+          <option value="week">Wöchentlich</option>
+          <option value="hour">Stündlich</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg" id="day-picker-wrap">
+      <label>An welchen Wochentagen erwartet? (leer = alle)</label>
+      <div class="days-grid">
+        <label class="day-cb"><input type="checkbox" name="wd" value="1"> Mo</label>
+        <label class="day-cb"><input type="checkbox" name="wd" value="2"> Di</label>
+        <label class="day-cb"><input type="checkbox" name="wd" value="3"> Mi</label>
+        <label class="day-cb"><input type="checkbox" name="wd" value="4"> Do</label>
+        <label class="day-cb"><input type="checkbox" name="wd" value="5"> Fr</label>
+        <label class="day-cb"><input type="checkbox" name="wd" value="6"> Sa</label>
+        <label class="day-cb"><input type="checkbox" name="wd" value="0"> So</label>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Notiz (optional)</label>
+      <textarea id="c-note" placeholder="z.B. Backup läuft um 03:00 Uhr..."></textarea>
+    </div>
+    <div class="mfooter">
+      <button class="btn" onclick="closeCustModal()">Abbrechen</button>
+      <button class="btn danger" id="c-del-btn" onclick="deleteCustomer()" style="display:none">Löschen</button>
+      <button class="btn prim" onclick="saveCustomer()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//   KONFIGURATION
+// ═══════════════════════════════════════════════
+const CLIENT_ID = "caa4a8cc-262a-4852-a95e-c8b7b8705673";
+const TENANT_ID = "3a992295-f65c-4cec-a31a-87024a0c2785";
+// ═══════════════════════════════════════════════
+
+const REDIRECT_URI = "http://localhost:3000/";
+
+let msalInstance, allMails=[], activeTab='dashboard';
+let dashFilter='all', mailFilter='all', editCustId=null;
+let donutChart=null, barChart=null;
+
+// ── Storage helpers ──
+const LS = {
+  get: k => { try{return JSON.parse(localStorage.getItem(k))}catch{return null} },
+  set: (k,v) => localStorage.setItem(k, JSON.stringify(v))
+};
+
+function getKW() {
+  return {
+    ok:  (LS.get('kw_ok')  || 'Erfolgreich,Success,Completed,OK,succeeded').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean),
+    wa:  (LS.get('kw_wa')  || 'Warnung,Warning,Wichtig,Attention').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean),
+    er:  (LS.get('kw_er')  || 'Fehler,Error,Failed,Critical').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean),
+  };
+}
+
+function getCustomers() { return LS.get('customers') || []; }
+function saveCustomers(c) { LS.set('customers', c); }
+
+// ── Classify ──
+function classify(subject) {
+  const s = (subject||'').toLowerCase();
+  const kw = getKW();
+  if (kw.er.some(k=>s.includes(k))) return 'er';
+  if (kw.wa.some(k=>s.includes(k))) return 'wa';
+  if (kw.ok.some(k=>s.includes(k))) return 'ok';
+  return 'un';
+}
+
+function matchCustomer(subject) {
+  const s = (subject||'').toLowerCase();
+  const custs = getCustomers();
+  return custs.find(c => {
+    const nm = (c.name||'').toLowerCase();
+    const al = (c.alias||'').toLowerCase();
+    return s.includes(nm) || (al && s.includes(al));
+  }) || null;
+}
+
+// ── Missing mail detection ──
+function buildMissingEntries(mails, days) {
+  const custs = getCustomers();
+  if (!custs.length) return [];
+  const now = new Date();
+  const missing = [];
+
+  custs.forEach(c => {
+    const name = c.name;
+    const window = c.window || 'day';
+    const expected = parseInt(c.count) || 1;
+    const workdays = (c.workdays||[]).map(Number);
+
+    // Build time slots
+    const slots = [];
+    if (window === 'day') {
+      for (let i=0; i<days; i++) {
+        const d = new Date(now);
+        d.setDate(d.getDate()-i);
+        const wd = d.getDay();
+        if (workdays.length===0 || workdays.includes(wd)) {
+          const dayStr = d.toISOString().slice(0,10);
+          // Only add past slots (not current day if <18:00)
+          if (i>0 || now.getHours()>=18) {
+            slots.push({key:dayStr, label:d.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'})});
+          }
+        }
+      }
+    } else if (window === 'week') {
+      // one slot per week
+      for (let i=0; i<Math.ceil(days/7); i++) {
+        const d = new Date(now);
+        d.setDate(d.getDate()-i*7);
+        const weekStart = new Date(d);
+        weekStart.setDate(d.getDate()-d.getDay());
+        const key = 'w'+weekStart.toISOString().slice(0,10);
+        slots.push({key, label:'KW '+weekStart.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'})});
+      }
+    }
+
+    slots.forEach(slot => {
+      let mailsInSlot;
+      if (window==='day') {
+        mailsInSlot = mails.filter(m => m.custId===c.id && m.date.slice(0,10)===slot.key);
+      } else {
+        const wStart = new Date(slot.key.slice(1));
+        const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate()+7);
+        mailsInSlot = mails.filter(m => m.custId===c.id && new Date(m.date)>=wStart && new Date(m.date)<wEnd);
+      }
+      const deficit = expected - mailsInSlot.length;
+      for (let d=0; d<deficit; d++) {
+        missing.push({
+          id: 'miss_'+c.id+'_'+slot.key+'_'+d,
+          subject: `[FEHLEND] ${name} – Erwartete E-Mail nicht eingegangen (${slot.label})`,
+          sender: '–',
+          date: slot.key+'T23:59:00Z',
+          status: 'missing',
+          custName: name,
+          custId: c.id,
+          isMissing: true
+        });
+      }
+    });
+  });
+
+  return missing;
+}
+
+// ── MSAL ──
+async function initMsal() {
+  if (!CLIENT_ID || CLIENT_ID==="DEINE-CLIENT-ID-HIER") return;
+  msalInstance = new msal.PublicClientApplication({
+    auth: { clientId:CLIENT_ID, authority:`https://login.microsoftonline.com/${TENANT_ID}`, redirectUri:REDIRECT_URI },
+    cache: { cacheLocation:'localStorage', storeAuthStateInCookie:false }
+  });
+  await msalInstance.initialize();
+  const resp = await msalInstance.handleRedirectPromise();
+  if (resp) { onLogin(resp.account); return; }
+  const accs = msalInstance.getAllAccounts();
+  if (accs.length) onLogin(accs[0]);
+}
+
+async function login() {
+  if (!msalInstance) { toast('Client-ID nicht konfiguriert.','err'); return; }
+  try { await msalInstance.loginRedirect({scopes:['User.Read','Mail.Read']}); }
+  catch(e) { toast('Login fehlgeschlagen: '+e.message,'err'); }
+}
+
+function logout() {
+  if (msalInstance) msalInstance.logoutRedirect();
+}
+
+function onLogin(acc) {
+  document.getElementById('v-login').style.display='none';
+  document.getElementById('main-nav').style.display='flex';
+  document.getElementById('upill').style.display='flex';
+  document.getElementById('btn-cfg').style.display='';
+  document.getElementById('btn-logout').style.display='';
+  document.getElementById('uname').textContent = acc.username||acc.name;
+  loadSettings();
+  showTab('dashboard');
+  reload();
+}
+
+async function getToken() {
+  const accs = msalInstance.getAllAccounts();
+  if (!accs.length) throw new Error('Nicht angemeldet');
+  try { return (await msalInstance.acquireTokenSilent({scopes:['Mail.Read'],account:accs[0]})).accessToken; }
+  catch { return (await msalInstance.acquireTokenRedirect({scopes:['Mail.Read'],account:accs[0]})).accessToken; }
+}
+
+// ── LOAD ──
+async function reload() {
+  const btn = document.getElementById('rbtn');
+  if (btn) { btn.textContent='…'; btn.disabled=true; }
+  const days = parseInt(document.getElementById('sel-period')?.value||7);
+  const folder = document.getElementById('sel-folder')?.value||'inbox';
+  const since = new Date();
+  since.setDate(since.getDate()-days);
+  const endpoint = folder==='inbox'
+    ? 'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages'
+    : 'https://graph.microsoft.com/v1.0/me/messages';
+  const params = new URLSearchParams({
+    '$filter':`receivedDateTime ge ${since.toISOString()}`,
+    '$select':'subject,receivedDateTime,from',
+    '$orderby':'receivedDateTime desc',
+    '$top':'999'
+  });
+  try {
+    const token = await getToken();
+    let url = `${endpoint}?${params}`;
+    let raw = [];
+    while(url) {
+      const res = await fetch(url,{headers:{Authorization:`Bearer ${token}`}});
+      if (!res.ok) throw new Error(`Graph API ${res.status}`);
+      const d = await res.json();
+      raw = raw.concat(d.value||[]);
+      url = d['@odata.nextLink']||null;
+    }
+    const custs = getCustomers();
+    allMails = raw.map(m => {
+      const cust = matchCustomer(m.subject);
+      return {
+        id: m.id,
+        subject: m.subject||'(kein Betreff)',
+        sender: m.from?.emailAddress?.address||'–',
+        date: m.receivedDateTime,
+        status: classify(m.subject),
+        custName: cust?.name||'–',
+        custId: cust?.id||null,
+        isMissing: false
+      };
+    });
+    // Add missing
+    const missingEntries = buildMissingEntries(allMails, days);
+    allMails = [...missingEntries, ...allMails];
+    document.getElementById('sync-lbl').textContent = 'Sync: '+new Date().toLocaleTimeString('de-CH');
+    updateAll();
+  } catch(e) {
+    toast('Fehler: '+e.message,'err');
+  }
+  if (btn) { btn.textContent='↻ Aktualisieren'; btn.disabled=false; }
+}
+
+// ── RENDER ALL ──
+function updateAll() {
+  renderStats();
+  renderCharts();
+  renderDashList();
+  renderCustomerGrid();
+  renderMailList();
+  updateMissBadge();
+}
+
+function counts() {
+  const ok=allMails.filter(m=>m.status==='ok').length;
+  const wa=allMails.filter(m=>m.status==='wa').length;
+  const er=allMails.filter(m=>m.status==='er').length;
+  const mis=allMails.filter(m=>m.isMissing).length;
+  const total=allMails.filter(m=>!m.isMissing).length;
+  return {ok,wa,er,mis,total};
+}
+
+function renderStats() {
+  const c = counts();
+  const pct = v => c.total>0?Math.round(v/c.total*100)+'%':'–';
+  document.getElementById('stats-row').innerHTML=`
+    <div class="sc c-tot"><div class="slbl">Gesamt</div><div class="sval">${c.total}</div><div class="ssub">E-Mails im Zeitraum</div></div>
+    <div class="sc c-ok"><div class="slbl">Erfolgreich</div><div class="sval">${c.ok}</div><div class="ssub">${pct(c.ok)}</div></div>
+    <div class="sc c-wa"><div class="slbl">Warnungen</div><div class="sval">${c.wa}</div><div class="ssub">${pct(c.wa)}</div></div>
+    <div class="sc c-er"><div class="slbl">Fehler</div><div class="sval">${c.er}</div><div class="ssub">${pct(c.er)}</div></div>
+    <div class="sc c-mis"><div class="slbl">Fehlende E-Mails</div><div class="sval">${c.mis}</div><div class="ssub">${c.mis>0?'Nicht eingegangen':'Alle erhalten'}</div></div>
+  `;
+}
+
+function renderCharts() {
+  const c = counts();
+  const ctx1 = document.getElementById('c-donut');
+  const ctx2 = document.getElementById('c-bar');
+  if (!ctx1||!ctx2) return;
+  if (donutChart) donutChart.destroy();
+  if (barChart) barChart.destroy();
+
+  donutChart = new Chart(ctx1.getContext('2d'),{
+    type:'doughnut',
+    data:{
+      labels:['Erfolgreich','Warnungen','Fehler','Fehlend'],
+      datasets:[{data:[c.ok,c.wa,c.er,c.mis],backgroundColor:['#22c55e','#f59e0b','#ef4444','#a855f7'],borderColor:'#18181b',borderWidth:3,hoverOffset:4}]
+    },
+    options:{cutout:'70%',plugins:{legend:{labels:{color:'#6b6b72',font:{size:11},boxWidth:10,padding:12}},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw}`}}}}
+  });
+
+  const days = parseInt(document.getElementById('sel-period')?.value||7);
+  const buckets={};
+  for(let i=days-1;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    buckets[d.toISOString().slice(0,10)]={ok:0,wa:0,er:0,mis:0};
+  }
+  allMails.forEach(m=>{
+    const day=m.date.slice(0,10);
+    if(buckets[day]) buckets[day][m.status==='missing'?'mis':m.status]=(buckets[day][m.status==='missing'?'mis':m.status]||0)+1;
+  });
+  const lbls=Object.keys(buckets).map(d=>new Date(d).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}));
+
+  barChart = new Chart(ctx2.getContext('2d'),{
+    type:'bar',
+    data:{
+      labels:lbls,
+      datasets:[
+        {label:'Erfolgreich',data:Object.values(buckets).map(b=>b.ok),backgroundColor:'rgba(34,197,94,0.7)',borderRadius:2},
+        {label:'Warnungen',data:Object.values(buckets).map(b=>b.wa),backgroundColor:'rgba(245,158,11,0.7)',borderRadius:2},
+        {label:'Fehler',data:Object.values(buckets).map(b=>b.er),backgroundColor:'rgba(239,68,68,0.7)',borderRadius:2},
+        {label:'Fehlend',data:Object.values(buckets).map(b=>b.mis),backgroundColor:'rgba(168,85,247,0.7)',borderRadius:2}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true,ticks:{color:'#6b6b72',font:{size:10},maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.04)'}},y:{stacked:true,ticks:{color:'#6b6b72',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}},plugins:{legend:{labels:{color:'#6b6b72',font:{size:11},boxWidth:10,padding:12}}}}
+  });
+}
+
+// ── DASH LIST ──
+function setDashFilter(f,el){
+  dashFilter=f;
+  document.querySelectorAll('#dash-ftabs .ft').forEach(t=>t.classList.remove('a'));
+  el.classList.add('a');
+  renderDashList();
+}
+
+function renderDashList(){
+  const filtered = dashFilter==='all'
+    ? allMails
+    : dashFilter==='missing'
+    ? allMails.filter(m=>m.isMissing)
+    : allMails.filter(m=>m.status===dashFilter&&!m.isMissing);
+  document.getElementById('dash-cnt').textContent=filtered.length+' Einträge';
+  document.getElementById('dash-list').innerHTML = filtered.length
+    ? filtered.slice(0,50).map(mailRow).join('')
+    : '<div class="empty">Keine Einträge in dieser Kategorie.</div>';
+}
+
+// ── MAIL LIST ──
+function setMailFilter(f,el){
+  mailFilter=f;
+  document.querySelectorAll('#mail-ftabs .ft').forEach(t=>t.classList.remove('a'));
+  el.classList.add('a');
+  renderMailList();
+}
+
+function renderMailList(){
+  const q=(document.getElementById('mail-search')?.value||'').toLowerCase();
+  let filtered = mailFilter==='all' ? allMails
+    : mailFilter==='missing' ? allMails.filter(m=>m.isMissing)
+    : allMails.filter(m=>m.status===mailFilter&&!m.isMissing);
+  if(q) filtered=filtered.filter(m=>m.subject.toLowerCase().includes(q)||m.custName.toLowerCase().includes(q));
+  document.getElementById('mail-cnt').textContent=filtered.length+' Einträge';
+  document.getElementById('mail-list').innerHTML=filtered.length
+    ? filtered.map(mailRow).join('')
+    : '<div class="empty">Keine E-Mails gefunden.</div>';
+}
+
+function mailRow(m){
+  const dateStr = new Date(m.date).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+  const st = m.isMissing?'missing':m.status;
+  const indCls = {ok:'ok',wa:'wa',er:'er',missing:'mis',un:'un'}[st]||'un';
+  const badge = {ok:'<span class="mbadge b-ok">Erfolgreich</span>',wa:'<span class="mbadge b-wa">Warnung</span>',er:'<span class="mbadge b-er">Fehler</span>',missing:'<span class="mbadge b-mis">Fehlend</span>',un:'<span class="mbadge b-un">Unbekannt</span>'}[st]||'';
+  return `<div class="mrow${m.isMissing?' mrow-miss':''}">
+    <div class="mind ${indCls}"></div>
+    <div class="mcust">${esc(m.custName)}</div>
+    <div><div class="msubj">${esc(m.subject)}</div><div class="msend">${esc(m.sender)}</div></div>
+    ${badge}
+    <span class="mdate">${dateStr}</span>
+  </div>`;
+}
+
+// ── CUSTOMER GRID ──
+function renderCustomerGrid(){
+  const custs = getCustomers();
+  const days = parseInt(document.getElementById('sel-period')?.value||7);
+  document.getElementById('cust-summary').textContent=custs.length+' Kunden konfiguriert';
+
+  if(!custs.length){
+    document.getElementById('cust-grid').innerHTML='<div class="empty" style="grid-column:1/-1">Noch keine Kunden erfasst.<br>Klicke auf «+ Kunde hinzufügen».</div>';
+    return;
+  }
+
+  document.getElementById('cust-grid').innerHTML=custs.map(c=>{
+    const custMails=allMails.filter(m=>m.custId===c.id&&!m.isMissing);
+    const missMails=allMails.filter(m=>m.custId===c.id&&m.isMissing);
+    const ok=custMails.filter(m=>m.status==='ok').length;
+    const wa=custMails.filter(m=>m.status==='wa').length;
+    const er=custMails.filter(m=>m.status==='er').length;
+    const hasMiss=missMails.length>0;
+    const hasErr=er>0;
+    const wlbl={day:'täglich',week:'wöchentlich',hour:'stündlich'}[c.window||'day'];
+    const lastMail=custMails[0];
+    const lastDate=lastMail?new Date(lastMail.date).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'–';
+    const dot=hasMiss||hasErr?`<div class="cc-dot" style="background:${hasMiss?'#a855f7':'#ef4444'}"></div>`:`<div class="cc-dot" style="background:#22c55e"></div>`;
+    return `<div class="cust-card${hasMiss?' has-miss':hasErr?' has-err':''}">
+      <div class="cc-top">
+        <div>
+          <div class="cc-name">${esc(c.name)}</div>
+          <div class="cc-kw">${c.count}× ${wlbl}${c.workdays?.length?' · '+formatDays(c.workdays):''}</div>
+        </div>
+        <div class="cc-status">
+          ${dot}
+          <div class="cc-actions">
+            <button class="icon-btn" onclick="openCustModal('${c.id}')" title="Bearbeiten">✎</button>
+          </div>
+        </div>
+      </div>
+      <div class="cc-stats">
+        <div class="cc-stat"><div class="cc-stat-val" style="color:var(--ok)">${ok}</div><div class="cc-stat-lbl">OK</div></div>
+        <div class="cc-stat"><div class="cc-stat-val" style="color:var(--wa)">${wa}</div><div class="cc-stat-lbl">Warn</div></div>
+        <div class="cc-stat"><div class="cc-stat-val" style="color:var(--er)">${er}</div><div class="cc-stat-lbl">Fehler</div></div>
+      </div>
+      <div class="cc-footer">
+        <span>Letzte E-Mail: ${lastDate}</span>
+        ${hasMiss?`<span class="miss-pill">${missMails.length} fehlend</span>`:''}
+      </div>
+      ${c.note?`<div style="margin-top:10px;font-size:10px;color:var(--t3);line-height:1.5">${esc(c.note)}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function formatDays(wds){
+  const names=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  return wds.map(d=>names[d]).join(',');
+}
+
+function updateMissBadge(){
+  const miss=allMails.filter(m=>m.isMissing).length;
+  const b=document.getElementById('miss-badge');
+  if(miss>0){b.textContent=miss;b.style.display='';}
+  else b.style.display='none';
+}
+
+// ── CUSTOMER MODAL ──
+function openCustModal(id=null){
+  editCustId=id;
+  document.getElementById('cust-modal-title').textContent=id?'Kunde bearbeiten':'Kunde hinzufügen';
+  document.getElementById('c-del-btn').style.display=id?'':'none';
+  document.querySelectorAll('input[name=wd]').forEach(cb=>cb.checked=false);
+  if(id){
+    const c=getCustomers().find(x=>x.id===id);
+    if(c){
+      document.getElementById('c-name').value=c.name||'';
+      document.getElementById('c-alias').value=c.alias||'';
+      document.getElementById('c-count').value=c.count||1;
+      document.getElementById('c-window').value=c.window||'day';
+      document.getElementById('c-note').value=c.note||'';
+      (c.workdays||[]).forEach(d=>{ const cb=document.querySelector(`input[name=wd][value="${d}"]`); if(cb)cb.checked=true; });
+    }
+  } else {
+    document.getElementById('c-name').value='';
+    document.getElementById('c-alias').value='';
+    document.getElementById('c-count').value=1;
+    document.getElementById('c-window').value='day';
+    document.getElementById('c-note').value='';
+  }
+  document.getElementById('cust-overlay').classList.add('open');
+}
+
+function closeCustModal(){ document.getElementById('cust-overlay').classList.remove('open'); editCustId=null; }
+
+function saveCustomer(){
+  const name=document.getElementById('c-name').value.trim();
+  if(!name){ toast('Kundenname ist pflicht.','err'); return; }
+  const workdays=[...document.querySelectorAll('input[name=wd]:checked')].map(cb=>parseInt(cb.value));
+  const data={
+    id: editCustId||('c_'+Date.now()),
+    name,
+    alias:document.getElementById('c-alias').value.trim(),
+    count:parseInt(document.getElementById('c-count').value)||1,
+    window:document.getElementById('c-window').value,
+    workdays,
+    note:document.getElementById('c-note').value.trim()
+  };
+  const custs=getCustomers();
+  if(editCustId){
+    const idx=custs.findIndex(c=>c.id===editCustId);
+    if(idx>=0) custs[idx]=data;
+  } else {
+    custs.push(data);
+  }
+  saveCustomers(custs);
+  closeCustModal();
+  toast(editCustId?'Kunde aktualisiert.':'Kunde gespeichert.','suc');
+  // Re-match mails
+  if(allMails.length) { allMails.forEach(m=>{ if(!m.isMissing){ const c=matchCustomer(m.subject); m.custName=c?.name||'–'; m.custId=c?.id||null; }}); }
+  updateAll();
+}
+
+function deleteCustomer(){
+  if(!editCustId||!confirm('Kunde wirklich löschen?')) return;
+  const custs=getCustomers().filter(c=>c.id!==editCustId);
+  saveCustomers(custs);
+  closeCustModal();
+  toast('Kunde gelöscht.','suc');
+  updateAll();
+}
+
+// ── SETTINGS ──
+function loadSettings(){
+  document.getElementById('s-ok').value=LS.get('kw_ok')||'Erfolgreich, Success, Completed, OK';
+  document.getElementById('s-wa').value=LS.get('kw_wa')||'Warnung, Warning, Wichtig, Attention';
+  document.getElementById('s-er').value=LS.get('kw_er')||'Fehler, Error, Failed, Critical';
+}
+
+function saveSettings(){
+  LS.set('kw_ok', document.getElementById('s-ok').value);
+  LS.set('kw_wa', document.getElementById('s-wa').value);
+  LS.set('kw_er', document.getElementById('s-er').value);
+  toast('Einstellungen gespeichert.','suc');
+}
+
+// ── TABS ──
+function showTab(name, el=null){
+  ['dashboard','customers','mails','settings'].forEach(t=>{
+    document.getElementById('v-'+t).style.display=t===name?'block':'none';
+  });
+  if(!el) el=document.querySelector(`.ntab[onclick*="${name}"]`);
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  activeTab=name;
+  if(name==='settings') loadSettings();
+}
+
+// ── UTILS ──
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function toast(msg,type='err'){
+  const t=document.getElementById('toast');
+  t.className=`toast ${type} show`;
+  t.textContent=msg;
+  setTimeout(()=>t.classList.remove('show'),4000);
+}
+
+// Close modal on overlay click
+document.getElementById('cust-overlay').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeCustModal(); });
+
+// Expose all functions globally for onclick handlers
+window.login = login;
+window.logout = logout;
+window.reload = reload;
+window.showTab = showTab;
+window.setDashFilter = setDashFilter;
+window.setMailFilter = setMailFilter;
+window.openCustModal = openCustModal;
+window.closeCustModal = closeCustModal;
+window.saveCustomer = saveCustomer;
+window.deleteCustomer = deleteCustomer;
+window.saveSettings = saveSettings;
+
+// Init after everything loaded
+// Make all functions explicitly global
+window.login=login; window.logout=logout; window.reload=reload;
+window.showTab=showTab; window.setDashFilter=setDashFilter;
+window.setMailFilter=setMailFilter; window.renderMailList=renderMailList;
+window.openCustModal=openCustModal; window.closeCustModal=closeCustModal;
+window.saveCustomer=saveCustomer; window.deleteCustomer=deleteCustomer;
+window.saveSettings=saveSettings; window.loadSettings=loadSettings;
+
+// Attach login button listener
+document.getElementById('ms-login-btn').addEventListener('click', () => login());
+
+// Init MSAL after short delay to ensure library is ready
+setTimeout(() => initMsal(), 500);
+</script>
+
+<!--
+════════════════════════════════════════════════════════
+  AZURE APP-REGISTRIERUNG – Einmaliger Setup
+════════════════════════════════════════════════════════
+
+SCHRITT 1 – App registrieren
+  1. https://portal.azure.com → "App-Registrierungen" → "Neue Registrierung"
+  2. Name: "Mail Monitor"
+  3. Kontotyp: "Konten in diesem Organisationsverzeichnis"
+  4. Umleitungs-URI: Plattform = SPA
+     Lokal:    http://localhost:3000/email-monitor.html
+     Webserver: https://deine-domain.ch/email-monitor.html
+  5. Registrieren
+
+SCHRITT 2 – Client-ID eintragen
+  - Anwendungs-ID (Client) kopieren
+  - In dieser Datei: CLIENT_ID = "..." ersetzen
+
+SCHRITT 3 – API-Berechtigungen
+  - Microsoft Graph → Mail.Read + User.Read
+  - Ggf. "Administratorzustimmung erteilen"
+
+SCHRITT 4 – Lokal starten
+  python -m http.server 3000
+  → http://localhost:3000/email-monitor.html
+════════════════════════════════════════════════════════
+-->
+</body>
+</html>
