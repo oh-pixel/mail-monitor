@@ -919,12 +919,12 @@ function mailRow(m){
   const badge = {ok:'<span class="mbadge b-ok">Erfolgreich</span>',wa:'<span class="mbadge b-wa">Warnung</span>',er:'<span class="mbadge b-er">Fehler</span>',missing:'<span class="mbadge b-mis">Fehlend</span>',un:'<span class="mbadge b-un">Unbekannt</span>'}[st]||'';
   const catBadges = (m.categories||[]).map(c => `<span style="padding:1px 6px;border-radius:10px;font-size:9px;background:var(--ac-d);color:var(--ac);margin-right:3px">${esc(c)}</span>`).join('');
   return `<div class="mrow${m.isMissing?' mrow-miss':''}" data-id="${esc(m.id)}">
-    <div class="cb-wrap"><input type="checkbox" class="mrow-cb mail-cb" data-id="${esc(m.id)}" onclick="updateMailSelection()"></div>
-    <div class="mind ${indCls}"></div>
-    <div class="mcust">${esc(m.custName)}</div>
-    <div><div class="msubj">${esc(m.subject)}</div><div class="msend">${esc(m.sender)}${catBadges?' · '+catBadges:''}</div></div>
+    <div style="flex-shrink:0;width:24px;display:flex;align-items:center;justify-content:center"><input type="checkbox" class="mrow-cb mail-cb" data-id="${esc(m.id)}" onclick="updateMailSelection()" style="width:13px;height:13px;accent-color:var(--ac);cursor:pointer"></div>
+    <div class="mind ${indCls}" style="flex-shrink:0"></div>
+    <div class="mcust" style="flex-shrink:0;width:120px">${esc(m.custName)}</div>
+    <div style="flex:1;min-width:0"><div class="msubj">${esc(m.subject)}</div><div class="msend">${esc(m.sender)}${catBadges?' · '+catBadges:''}</div></div>
     ${badge}
-    <span class="mdate">${dateStr}</span>
+    <span class="mdate" style="flex-shrink:0">${dateStr}</span>
   </div>`;
 }
 
