@@ -206,6 +206,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
   <button class="ntab active" id="nav-dashboard">Dashboard</button>
   <button class="ntab" id="nav-customers">Kunden <span class="nbadge" id="miss-badge" style="display:none">0</span></button>
   <button class="ntab" id="nav-mails">E-Mails</button>
+  <button class="ntab" id="nav-db">Datenbank <span class="nbadge" id="db-badge" style="display:none;background:rgba(99,102,241,0.15);color:#6366f1">0</span></button>
   <button class="ntab" id="nav-settings">Einstellungen</button>
 </div>
 
@@ -298,6 +299,56 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
       <span class="mcnt" id="mail-cnt">–</span>
     </div>
     <div id="mail-list"></div>
+  </div>
+</div>
+
+
+<!-- DATABASE -->
+<div id="v-db" style="display:none">
+  <div class="toolbar">
+    <div class="tl">
+      <span style="font-size:13px;color:var(--t2)" id="db-summary">0 E-Mails gespeichert</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="sync-lbl" id="db-last-sync">Noch kein Sync</span>
+      <button class="btn" id="btn-db-sync-new">+ Nur neue laden</button>
+      <button class="btn prim" id="btn-db-sync-full">↻ Vollsync</button>
+      <button class="btn" id="btn-db-export">CSV Export</button>
+      <button class="btn danger" id="btn-db-clear">DB leeren</button>
+    </div>
+  </div>
+  <div style="margin-bottom:16px;background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:14px 18px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)">
+      <span>Auto-Sync:</span>
+      <select id="autosync-interval" style="font-size:12px">
+        <option value="0">Deaktiviert</option>
+        <option value="5">Alle 5 Min</option>
+        <option value="15">Alle 15 Min</option>
+        <option value="30">Alle 30 Min</option>
+        <option value="60">Alle 60 Min</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--t2)">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--t3);display:inline-block" id="autosync-dot"></span>
+      <span id="autosync-status">Inaktiv</span>
+    </div>
+    <div style="font-size:11px;color:var(--t3)">Speichernutzung: <span id="db-storage">–</span></div>
+  </div>
+  <div class="mc">
+    <div class="mc-head">
+      <div class="ftabs" id="db-ftabs">
+        <button class="ft a" data-filter="all" data-target="db">Alle</button>
+        <button class="ft ok" data-filter="ok" data-target="db">Erfolgreich</button>
+        <button class="ft wa" data-filter="wa" data-target="db">Warnungen</button>
+        <button class="ft er" data-filter="er" data-target="db">Fehler</button>
+        <button class="ft mis" data-filter="missing" data-target="db">Fehlend</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input class="search-inp" type="text" placeholder="Betreff / Kunde suchen..." id="db-search" style="width:180px">
+        <span class="mcnt" id="db-cnt">–</span>
+      </div>
+    </div>
+    <div id="db-list"></div>
   </div>
 </div>
 
@@ -857,16 +908,185 @@ function saveSettings(){
   toast('Einstellungen gespeichert.','suc');
 }
 
+
+// ── DATABASE (localStorage) ──
+const DB_KEY = 'mailmonitor_db';
+const DB_META_KEY = 'mailmonitor_db_meta';
+let dbFilter = 'all';
+let autoSyncTimer = null;
+
+function getDB() {
+  try { return JSON.parse(localStorage.getItem(DB_KEY)) || []; } catch { return []; }
+}
+
+function saveDB(mails) {
+  try {
+    // Keep max 5000 entries, newest first
+    const sorted = mails.sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5000);
+    localStorage.setItem(DB_KEY, JSON.stringify(sorted));
+    const meta = { count: sorted.length, lastSync: new Date().toISOString() };
+    localStorage.setItem(DB_META_KEY, JSON.stringify(meta));
+    return sorted;
+  } catch(e) {
+    toast('Speicher voll! Bitte DB leeren.', 'err');
+    return mails;
+  }
+}
+
+function getDBMeta() {
+  try { return JSON.parse(localStorage.getItem(DB_META_KEY)) || {}; } catch { return {}; }
+}
+
+function syncNewMails(mailsFromGraph) {
+  const db = getDB();
+  const existingIds = new Set(db.map(m => m.id));
+  const newMails = mailsFromGraph.filter(m => !m.isMissing && !existingIds.has(m.id));
+  if (newMails.length === 0) {
+    toast('Keine neuen E-Mails gefunden.', 'suc');
+    return db;
+  }
+  const merged = [...newMails, ...db];
+  const saved = saveDB(merged);
+  toast(newMails.length + ' neue E-Mail(s) gespeichert.', 'suc');
+  return saved;
+}
+
+function fullSyncMails(mailsFromGraph) {
+  const db = getDB();
+  const existingIds = new Set(db.map(m => m.id));
+  const newMails = mailsFromGraph.filter(m => !m.isMissing && !existingIds.has(m.id));
+  const merged = [...newMails, ...db];
+  const saved = saveDB(merged);
+  toast(newMails.length + ' neue + ' + (saved.length - newMails.length) + ' bestehende E-Mails.', 'suc');
+  return saved;
+}
+
+function clearDB() {
+  if (!confirm('Alle gespeicherten E-Mails löschen? Kann nicht rückgängig gemacht werden.')) return;
+  localStorage.removeItem(DB_KEY);
+  localStorage.removeItem(DB_META_KEY);
+  toast('Datenbank geleert.', 'suc');
+  renderDBView();
+  updateDBBadge();
+}
+
+function exportCSV() {
+  const db = getDB();
+  if (!db.length) { toast('Keine Daten zum Exportieren.', 'err'); return; }
+  const rows = [['Datum','Betreff','Absender','Kunde','Status']];
+  db.forEach(m => {
+    rows.push([
+      new Date(m.date).toLocaleString('de-CH'),
+      (m.subject||'').replace(/,/g,''),
+      m.sender||'',
+      m.custName||'',
+      m.status||''
+    ]);
+  });
+  const csv = rows.map(r => r.join(',')).join('
+');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'mail-monitor-export-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function setAutoSync(minutes) {
+  if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
+  const dot = document.getElementById('autosync-dot');
+  const status = document.getElementById('autosync-status');
+  if (minutes === 0) {
+    if (dot) dot.style.background = 'var(--t3)';
+    if (status) status.textContent = 'Inaktiv';
+    return;
+  }
+  if (dot) dot.style.background = 'var(--ok)';
+  if (status) status.textContent = 'Alle ' + minutes + ' Min aktiv';
+  autoSyncTimer = setInterval(async () => {
+    try {
+      await reload();
+      const db = syncNewMails(allMails);
+      renderDBView();
+      updateDBBadge();
+    } catch(e) { console.error('Auto-sync error:', e); }
+  }, minutes * 60 * 1000);
+}
+
+function updateDBBadge() {
+  const db = getDB();
+  const badge = document.getElementById('db-badge');
+  if (badge) {
+    badge.textContent = db.length;
+    badge.style.display = db.length > 0 ? '' : 'none';
+  }
+}
+
+function renderDBView() {
+  const db = getDB();
+  const meta = getDBMeta();
+  const q = (document.getElementById('db-search')?.value || '').toLowerCase();
+
+  // Update summary
+  const summary = document.getElementById('db-summary');
+  if (summary) summary.textContent = db.length + ' E-Mails gespeichert';
+
+  // Last sync
+  const lastSync = document.getElementById('db-last-sync');
+  if (lastSync && meta.lastSync) {
+    lastSync.textContent = 'Letzter Sync: ' + new Date(meta.lastSync).toLocaleString('de-CH');
+  }
+
+  // Storage size
+  const storageEl = document.getElementById('db-storage');
+  if (storageEl) {
+    const size = new Blob([localStorage.getItem(DB_KEY)||'']).size;
+    storageEl.textContent = size > 1024*1024
+      ? (size/1024/1024).toFixed(1) + ' MB'
+      : Math.round(size/1024) + ' KB';
+  }
+
+  // Filter
+  let filtered = dbFilter === 'all' ? db : db.filter(m => m.status === dbFilter);
+  if (q) filtered = filtered.filter(m =>
+    (m.subject||'').toLowerCase().includes(q) ||
+    (m.custName||'').toLowerCase().includes(q)
+  );
+
+  const cnt = document.getElementById('db-cnt');
+  if (cnt) cnt.textContent = filtered.length + ' Einträge';
+
+  const list = document.getElementById('db-list');
+  if (!list) return;
+
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">Keine E-Mails in der Datenbank.</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.slice(0, 200).map(m => mailRow(m)).join('');
+}
+
+function setDBFilter(f, el) {
+  dbFilter = f;
+  document.querySelectorAll('#db-ftabs .ft').forEach(t => t.classList.remove('a'));
+  if (el) el.classList.add('a');
+  renderDBView();
+}
+
 // ── TABS ──
 function showTab(name, el=null){
-  ['dashboard','customers','mails','settings'].forEach(t=>{
-    document.getElementById('v-'+t).style.display=t===name?'block':'none';
+  ['dashboard','customers','mails','settings','db'].forEach(t=>{
+    const v=document.getElementById('v-'+t);
+    if(v) v.style.display=t===name?'block':'none';
   });
-  if(!el) el=document.querySelector(`.ntab[onclick*="${name}"]`);
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
   activeTab=name;
   if(name==='settings') loadSettings();
+  if(name==='db') renderDBView();
 }
 
 // ── UTILS ──
@@ -940,6 +1160,32 @@ setTimeout(function setupEvents() {
 
   // Modal overlay click
   document.getElementById('cust-overlay')?.addEventListener('click', function(e){ if(e.target===this) closeCustModal(); });
+
+  // Database tab
+  document.getElementById('nav-db')?.addEventListener('click', function(){ showTab('db', this); });
+  document.getElementById('btn-db-sync-new')?.addEventListener('click', async function(){
+    await reload();
+    syncNewMails(allMails);
+    renderDBView();
+    updateDBBadge();
+  });
+  document.getElementById('btn-db-sync-full')?.addEventListener('click', async function(){
+    await reload();
+    fullSyncMails(allMails);
+    renderDBView();
+    updateDBBadge();
+  });
+  document.getElementById('btn-db-export')?.addEventListener('click', function(){ exportCSV(); });
+  document.getElementById('btn-db-clear')?.addEventListener('click', function(){ clearDB(); });
+  document.getElementById('db-search')?.addEventListener('input', function(){ renderDBView(); });
+  document.getElementById('autosync-interval')?.addEventListener('change', function(){
+    setAutoSync(parseInt(this.value));
+  });
+  document.querySelectorAll('[data-filter][data-target="db"]').forEach(function(btn) {
+    btn.addEventListener('click', function(){ setDBFilter(this.dataset.filter, this); });
+  });
+
+  updateDBBadge();
 
   setTimeout(() => initMsal(), 500);
 }, 100);
