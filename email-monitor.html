@@ -633,6 +633,17 @@ async function onLogin(acc) {
     toast(ghCustomers.length + ' Kunden von GitHub geladen.', 'suc');
   }
 
+  // Load DB from GitHub
+  const ghDB = await loadDBFromGH();
+  if (ghDB !== null) {
+    if (ghDB.length > 0) {
+      localStorage.setItem(DB_KEY, JSON.stringify(ghDB));
+      const meta = { count: ghDB.length, lastSync: new Date().toISOString() };
+      localStorage.setItem(DB_META_KEY, JSON.stringify(meta));
+      toast(ghDB.length + ' E-Mails aus GitHub Datenbank geladen.', 'suc');
+    }
+  }
+
   reload();
 }
 
@@ -1319,20 +1330,83 @@ function getDB() {
 
 function saveDB(mails) {
   try {
-    // Keep max 5000 entries, newest first
-    const sorted = mails.sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5000);
+    const sorted = mails.sort((a,b) => new Date(b.date) - new Date(a.date));
     localStorage.setItem(DB_KEY, JSON.stringify(sorted));
     const meta = { count: sorted.length, lastSync: new Date().toISOString() };
     localStorage.setItem(DB_META_KEY, JSON.stringify(meta));
+    // Also save to GitHub (async)
+    saveDBToGH(sorted);
     return sorted;
   } catch(e) {
-    toast('Speicher voll! Bitte DB leeren.', 'err');
+    toast('Lokaler Speicher voll! Daten werden nur auf GitHub gespeichert.', 'err');
     return mails;
   }
 }
 
 function getDBMeta() {
   try { return JSON.parse(localStorage.getItem(DB_META_KEY)) || {}; } catch { return {}; }
+}
+
+async function loadDBFromGH() {
+  const {token, repo} = getGHConfig();
+  if (!token || !repo) return null;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/datenbank.json`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (res.status === 404) return [];
+    if (!res.ok) return null;
+    const data = await res.json();
+    // GitHub returns base64 encoded content
+    const decoded = decodeURIComponent(escape(atob(data.content.replace(/
+/g, ''))));
+    return JSON.parse(decoded);
+  } catch(e) {
+    console.error('GH DB load error:', e);
+    return null;
+  }
+}
+
+let dbSaveTimer = null;
+async function saveDBToGH(mails) {
+  // Debounce - wait 3 seconds after last change before saving
+  if (dbSaveTimer) clearTimeout(dbSaveTimer);
+  dbSaveTimer = setTimeout(async () => {
+    const {token, repo} = getGHConfig();
+    if (!token || !repo) return;
+    try {
+      // Check size warning
+      const jsonStr = JSON.stringify(mails);
+      const sizeMB = new Blob([jsonStr]).size / 1024 / 1024;
+      if (sizeMB > 50) {
+        toast('Warnung: Datenbank ist ' + sizeMB.toFixed(1) + 'MB gross!', 'err');
+      }
+
+      let sha = null;
+      const check = await fetch(`https://api.github.com/repos/${repo}/contents/datenbank.json`, {
+        headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+      });
+      if (check.ok) sha = (await check.json()).sha;
+
+      const body = {
+        message: 'Datenbank aktualisiert via Mail Monitor',
+        content: btoa(unescape(encodeURIComponent(jsonStr)))
+      };
+      if (sha) body.sha = sha;
+
+      await fetch(`https://api.github.com/repos/${repo}/contents/datenbank.json`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `token ${token}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+    } catch(e) {
+      console.error('GH DB save error:', e);
+    }
+  }, 3000);
 }
 
 function syncNewMails(mailsFromGraph) {
@@ -1440,9 +1514,11 @@ function renderDBView() {
   const storageEl = document.getElementById('db-storage');
   if (storageEl) {
     const size = new Blob([localStorage.getItem(DB_KEY)||'']).size;
-    storageEl.textContent = size > 1024*1024
+    const {repo} = getGHConfig();
+    const ghStatus = repo ? ' · GitHub: ' + repo + '/datenbank.json' : ' · Kein GitHub konfiguriert';
+    storageEl.textContent = (size > 1024*1024
       ? (size/1024/1024).toFixed(1) + ' MB'
-      : Math.round(size/1024) + ' KB';
+      : Math.round(size/1024) + ' KB') + ghStatus;
   }
 
   // Filter
