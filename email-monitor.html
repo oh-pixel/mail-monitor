@@ -195,47 +195,8 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
 ::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px}
 @media(max-width:900px){.stats{grid-template-columns:repeat(3,1fr)}.charts-row{grid-template-columns:1fr}main{padding:16px}}
 </style>
-
-<style>
-#back-to-hub {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: rgba(20,20,30,0.92);
-  border: 1px solid rgba(108,99,255,0.45);
-  color: #a09af5;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  padding: 7px 14px 7px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  text-decoration: none;
-  backdrop-filter: blur(6px);
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
-}
-#back-to-hub:hover {
-  border-color: #6c63ff;
-  color: #fff;
-  background: rgba(108,99,255,0.18);
-}
-#back-to-hub svg {
-  flex-shrink: 0;
-}
-</style>
 </head>
 <body>
-<a id="back-to-hub" href="https://oh-pixel.github.io/control-hub/" title="Zurück zum Dashboard">
-  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-    <path d="M8 2L4 6.5L8 11" stroke="#a09af5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>
-  ControlHub
-</a>
-
 
 <!-- TOPBAR -->
 <div class="topbar">
@@ -251,6 +212,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
     <div class="upill" id="upill" style="display:none"><div class="udot"></div><span id="uname">–</span></div>
     <button class="btn" id="btn-cfg" data-tab="'settings')" style="display:none">Einstellungen</button>
     <button class="btn" id="btn-logout" id="btn-logout-el" style="display:none">Abmelden</button>
+    <a class="btn" id="btn-back-hub" href="https://oh-pixel.github.io/control-hub/" style="display:none;text-decoration:none;">← ControlHub</a>
   </div>
 </div>
 
@@ -693,6 +655,7 @@ async function onLogin(acc) {
   document.getElementById('upill').style.display='flex';
   document.getElementById('btn-cfg').style.display='';
   document.getElementById('btn-logout').style.display='';
+  document.getElementById('btn-back-hub').style.display='';
   document.getElementById('uname').textContent = acc.username||acc.name;
   loadSettings();
   showTab('dashboard');
