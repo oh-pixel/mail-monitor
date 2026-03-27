@@ -258,6 +258,15 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
     <div class="cc"><div class="ctitle">Verteilung</div><div class="chart-wrap"><canvas id="c-donut"></canvas></div></div>
     <div class="cc"><div class="ctitle">Verlauf (täglich)</div><div class="chart-wrap"><canvas id="c-bar"></canvas></div></div>
   </div>
+
+  <div class="cc" id="unknown-chart-wrap" style="margin-bottom:16px;display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="ctit" style="margin-bottom:0">Unbekannte E-Mails <span id="unknown-count" style="color:var(--t3)"></span></div>
+      <span style="font-size:11px;color:var(--t3)">Kein passendes Keyword – prüfe ob Keywords ergänzt werden müssen</span>
+    </div>
+    <div id="unknown-list"></div>
+  </div>
+
   <div class="mc">
     <div class="mc-head">
       <div class="ftabs" id="dash-ftabs">
@@ -699,10 +708,38 @@ async function reload() {
 function updateAll() {
   renderStats();
   renderCharts();
+  renderUnknownList();
   renderDashList();
   renderCustomerGrid();
   renderMailList();
   updateMissBadge();
+}
+
+function renderUnknownList() {
+  const unknown = allMails.filter(m => m.status === 'un' && !m.isMissing);
+  const wrap = document.getElementById('unknown-chart-wrap');
+  const list = document.getElementById('unknown-list');
+  const cnt = document.getElementById('unknown-count');
+  if (!wrap || !list) return;
+
+  if (!unknown.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  wrap.style.display = 'block';
+  if (cnt) cnt.textContent = '(' + unknown.length + ')';
+
+  list.innerHTML = unknown.slice(0, 50).map(m => {
+    const dateStr = new Date(m.date).toLocaleDateString('de-CH', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+    return `<div class="mrow">
+      <div class="mind un"></div>
+      <div class="mcust">${esc(m.custName)}</div>
+      <div><div class="msubj">${esc(m.subject)}</div><div class="msend">${esc(m.sender)}</div></div>
+      <span class="mbadge b-un">Unbekannt</span>
+      <span class="mdate">${dateStr}</span>
+    </div>`;
+  }).join('');
 }
 
 function counts() {
@@ -739,8 +776,8 @@ function renderCharts() {
   donutChart = new Chart(ctx1.getContext('2d'),{
     type:'doughnut',
     data:{
-      labels:['Erfolgreich','Warnungen','Fehler','Fehlend','Unbekannt'],
-      datasets:[{data:[c.ok,c.wa,c.er,c.mis,c.un],backgroundColor:['#22c55e','#f59e0b','#ef4444','#a855f7','#6b6b72'],borderColor:'#18181b',borderWidth:3,hoverOffset:4}]
+      labels:['Erfolgreich','Warnungen','Fehler','Fehlend'],
+      datasets:[{data:[c.ok,c.wa,c.er,c.mis],backgroundColor:['#22c55e','#f59e0b','#ef4444','#a855f7'],borderColor:'#18181b',borderWidth:3,hoverOffset:4}]
     },
     options:{cutout:'70%',plugins:{legend:{labels:{color:'#6b6b72',font:{size:11},boxWidth:10,padding:12}},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw}`}}}}
   });
@@ -767,7 +804,7 @@ function renderCharts() {
         {label:'Warnungen',data:Object.values(buckets).map(b=>b.wa),backgroundColor:'rgba(245,158,11,0.7)',borderRadius:2},
         {label:'Fehler',data:Object.values(buckets).map(b=>b.er),backgroundColor:'rgba(239,68,68,0.7)',borderRadius:2},
         {label:'Fehlend',data:Object.values(buckets).map(b=>b.mis),backgroundColor:'rgba(168,85,247,0.7)',borderRadius:2},
-        {label:'Unbekannt',data:Object.values(buckets).map(b=>b.un||0),backgroundColor:'rgba(107,107,114,0.7)',borderRadius:2}
+
       ]
     },
     options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true,ticks:{color:'#6b6b72',font:{size:10},maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.04)'}},y:{stacked:true,ticks:{color:'#6b6b72',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}},plugins:{legend:{labels:{color:'#6b6b72',font:{size:11},boxWidth:10,padding:12}}}}
