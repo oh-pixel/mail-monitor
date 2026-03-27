@@ -275,7 +275,12 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
 <div id="v-customers" style="display:none">
   <div class="cust-toolbar">
     <span style="font-size:13px;color:var(--t2)" id="cust-summary">–</span>
-    <button class="btn prim" id="btn-add-cust">+ Kunde hinzufügen</button>
+    <div style="display:flex;gap:8px">
+        <button class="btn" id="btn-cust-export">Backup exportieren</button>
+        <button class="btn" id="btn-cust-import">Backup importieren</button>
+        <input type="file" id="cust-import-file" accept=".json" style="display:none">
+        <button class="btn prim" id="btn-add-cust">+ Kunde hinzufügen</button>
+      </div>
   </div>
   <div class="cust-grid" id="cust-grid"></div>
 </div>
@@ -354,6 +359,25 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
 
 <!-- SETTINGS -->
 <div id="v-settings" style="display:none">
+  <div style="background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:18px 20px;margin-bottom:22px">
+    <div style="font-size:13px;font-weight:500;color:var(--t1);margin-bottom:4px">GitHub Kunden-Synchronisation</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:14px">Kunden werden in kunden.json auf GitHub gespeichert und bleiben dauerhaft erhalten.</div>
+    <div class="two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div class="fg">
+        <label>GitHub Personal Access Token</label>
+        <input type="password" id="gh-token" placeholder="ghp_..." style="width:100%;padding:8px 11px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-family:var(--mono);font-size:12px">
+      </div>
+      <div class="fg">
+        <label>Repository (user/repo)</label>
+        <input type="text" id="gh-repo" placeholder="oh-pixel/mail-monitor" style="width:100%;padding:8px 11px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-family:var(--mono);font-size:12px">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn prim" id="btn-save-gh">GitHub Verbindung speichern</button>
+      <button class="btn" id="btn-test-gh">Verbindung testen</button>
+      <span id="gh-status" style="font-size:12px;color:var(--t3)"></span>
+    </div>
+  </div>
   <div style="margin-bottom:20px;font-size:13px;color:var(--t2)">Keywords zur Klassifizierung der Betreffzeilen</div>
   <div class="kw-section">
     <div class="kw-col"><div class="kw-col-title t-ok">Erfolgreich</div><textarea id="s-ok" placeholder="Erfolgreich, Success, OK..." rows="4"></textarea><div class="form-hint">Kommagetrennte Keywords</div></div>
@@ -452,7 +476,10 @@ function getKW() {
 }
 
 function getCustomers() { return LS.get('customers') || []; }
-function saveCustomers(c) { LS.set('customers', c); }
+function saveCustomers(c) {
+  LS.set('customers', c);
+  saveCustomersToGH(c); // async, fire and forget
+}
 
 // ── Classify ──
 function classify(subject) {
@@ -566,7 +593,7 @@ function logout() {
   if (msalInstance) msalInstance.logoutRedirect();
 }
 
-function onLogin(acc) {
+async function onLogin(acc) {
   document.getElementById('v-login').style.display='none';
   document.getElementById('main-nav').style.display='flex';
   document.getElementById('upill').style.display='flex';
@@ -575,6 +602,14 @@ function onLogin(acc) {
   document.getElementById('uname').textContent = acc.username||acc.name;
   loadSettings();
   showTab('dashboard');
+
+  // Load customers from GitHub if configured
+  const ghCustomers = await loadCustomersFromGH();
+  if (ghCustomers && ghCustomers.length > 0) {
+    LS.set('customers', ghCustomers);
+    toast(ghCustomers.length + ' Kunden von GitHub geladen.', 'suc');
+  }
+
   reload();
 }
 
@@ -909,6 +944,11 @@ function loadSettings(){
   document.getElementById('s-ok').value=LS.get('kw_ok')||'Erfolgreich, Success, Completed, OK';
   document.getElementById('s-wa').value=LS.get('kw_wa')||'Warnung, Warning, Wichtig, Attention';
   document.getElementById('s-er').value=LS.get('kw_er')||'Fehler, Error, Failed, Critical';
+  const {token, repo} = getGHConfig();
+  const tokenEl = document.getElementById('gh-token');
+  const repoEl = document.getElementById('gh-repo');
+  if (tokenEl && token) tokenEl.value = token;
+  if (repoEl && repo) repoEl.value = repo;
 }
 
 function saveSettings(){
@@ -918,6 +958,102 @@ function saveSettings(){
   toast('Einstellungen gespeichert.','suc');
 }
 
+
+
+// ── GITHUB KUNDEN-SYNC ──
+const GH_TOKEN_KEY = 'gh_token';
+const GH_REPO_KEY = 'gh_repo';
+const GH_FILE = 'kunden.json';
+
+function getGHConfig() {
+  return {
+    token: localStorage.getItem(GH_TOKEN_KEY) || '',
+    repo: localStorage.getItem(GH_REPO_KEY) || ''
+  };
+}
+
+function saveGHConfig() {
+  const token = document.getElementById('gh-token').value.trim();
+  const repo = document.getElementById('gh-repo').value.trim();
+  localStorage.setItem(GH_TOKEN_KEY, token);
+  localStorage.setItem(GH_REPO_KEY, repo);
+  toast('GitHub Verbindung gespeichert.', 'suc');
+}
+
+async function testGHConnection() {
+  const {token, repo} = getGHConfig();
+  if (!token || !repo) { toast('Token und Repository eintragen.', 'err'); return; }
+  const status = document.getElementById('gh-status');
+  if (status) status.textContent = 'Verbinde...';
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (res.ok) {
+      if (status) { status.textContent = '✓ Verbindung erfolgreich'; status.style.color = 'var(--ok)'; }
+      toast('GitHub Verbindung funktioniert!', 'suc');
+    } else {
+      if (status) { status.textContent = '✗ Fehler: ' + res.status; status.style.color = 'var(--er)'; }
+      toast('Verbindung fehlgeschlagen: ' + res.status, 'err');
+    }
+  } catch(e) {
+    if (status) { status.textContent = '✗ ' + e.message; status.style.color = 'var(--er)'; }
+    toast('Fehler: ' + e.message, 'err');
+  }
+}
+
+async function loadCustomersFromGH() {
+  const {token, repo} = getGHConfig();
+  if (!token || !repo) return null;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/${GH_FILE}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (res.status === 404) return [];
+    if (!res.ok) return null;
+    const data = await res.json();
+    const decoded = atob(data.content.replace(/\n/g, ''));
+    return JSON.parse(decoded);
+  } catch(e) {
+    console.error('GH load error:', e);
+    return null;
+  }
+}
+
+async function saveCustomersToGH(customers) {
+  const {token, repo} = getGHConfig();
+  if (!token || !repo) return;
+  try {
+    // Get current file SHA if exists
+    let sha = null;
+    const check = await fetch(`https://api.github.com/repos/${repo}/contents/${GH_FILE}`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (check.ok) {
+      const d = await check.json();
+      sha = d.sha;
+    }
+
+    const body = {
+      message: 'Kunden aktualisiert via Mail Monitor',
+      content: btoa(unescape(encodeURIComponent(JSON.stringify(customers, null, 2)))),
+    };
+    if (sha) body.sha = sha;
+
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/${GH_FILE}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error('Status ' + res.status);
+  } catch(e) {
+    toast('GitHub Speichern fehlgeschlagen: ' + e.message, 'err');
+  }
+}
 
 // ── DATABASE (localStorage) ──
 const DB_KEY = 'mailmonitor_db';
@@ -1158,6 +1294,8 @@ setTimeout(function setupEvents() {
   // Settings
   document.getElementById('btn-save-settings')?.addEventListener('click', function(){ saveSettings(); });
   document.getElementById('btn-reeval')?.addEventListener('click', function(){ reload(); });
+  document.getElementById('btn-save-gh')?.addEventListener('click', function(){ saveGHConfig(); });
+  document.getElementById('btn-test-gh')?.addEventListener('click', function(){ testGHConnection(); });
 
   // Filter tabs
   document.querySelectorAll('[data-filter][data-target="dash"]').forEach(function(btn) {
