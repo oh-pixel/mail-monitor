@@ -627,9 +627,19 @@ async function reload() {
         isMissing: false
       };
     });
-    // Add missing
-    const missingEntries = buildMissingEntries(allMails, days);
-    allMails = [...missingEntries, ...allMails];
+    // Auto-save new mails to DB
+    syncNewMails(allMails);
+    updateDBBadge();
+
+    // Merge with DB so deleted mails from inbox still show
+    const db = getDB();
+    const graphIds = new Set(allMails.map(m => m.id));
+    const dbOnlyMails = db.filter(m => !graphIds.has(m.id) && !m.isMissing);
+    const mergedMails = [...allMails, ...dbOnlyMails];
+
+    // Add missing entries
+    const missingEntries = buildMissingEntries(mergedMails, days);
+    allMails = [...missingEntries, ...mergedMails];
     document.getElementById('sync-lbl').textContent = 'Sync: '+new Date().toLocaleTimeString('de-CH');
     updateAll();
   } catch(e) {
