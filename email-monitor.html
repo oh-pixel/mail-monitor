@@ -309,8 +309,8 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
 
 <!-- MAILS -->
 <div id="v-mails" style="display:none">
-  <div class="toolbar">
-    <div class="tl">
+  <div class="mc">
+    <div class="mc-head">
       <div class="ftabs" id="mail-ftabs">
         <button class="ft a" data-filter="all" data-target="mail">Alle</button>
         <button class="ft ok" data-filter="ok" data-target="mail">Erfolgreich</button>
@@ -319,16 +319,14 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
         <button class="ft mis" data-filter="missing" data-target="mail">Fehlend</button>
         <button class="ft" data-filter="un" data-target="mail">Unbekannt</button>
       </div>
+      <input class="search-inp" type="text" placeholder="Betreff / Kunde suchen..." id="mail-search" oninput="renderMailList()" style="width:180px">
     </div>
-    <input class="search-inp" type="text" placeholder="Betreff / Kunde suchen..." id="mail-search" oninput="renderMailList()">
-  </div>
-  <div class="mc">
-    <div class="mc-head">
-      <div style="display:flex;align-items:center;gap:10px">
-        <input type="checkbox" class="mrow-cb" id="mail-select-all" title="Alle auswählen" onclick="window.toggleSelectAll()">
-        <span class="mcnt" id="mail-cnt">–</span>
+    <div style="padding:7px 18px;border-bottom:0.5px solid var(--b1);background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" class="mrow-cb" id="mail-select-all" style="width:13px;height:13px;accent-color:var(--ac);cursor:pointer" onclick="window.toggleSelectAll()">
+        <span class="mcnt" id="mail-cnt" style="font-size:11px;color:var(--t3)">–</span>
       </div>
-      <button class="btn danger" id="btn-delete-selected" style="display:none;font-size:12px;padding:5px 12px" onclick="window.deleteSelectedMails()">Ausgewählte löschen</button>
+      <button id="btn-delete-selected" style="display:none;padding:4px 12px;background:var(--er-d);border:1px solid var(--er-b);border-radius:20px;font-size:11px;color:var(--er);cursor:pointer" onclick="window.deleteSelectedMails()">Ausgewählte löschen</button>
     </div>
     <div id="mail-list"></div>
   </div>
@@ -921,7 +919,7 @@ function mailRow(m){
   const badge = {ok:'<span class="mbadge b-ok">Erfolgreich</span>',wa:'<span class="mbadge b-wa">Warnung</span>',er:'<span class="mbadge b-er">Fehler</span>',missing:'<span class="mbadge b-mis">Fehlend</span>',un:'<span class="mbadge b-un">Unbekannt</span>'}[st]||'';
   const catBadges = (m.categories||[]).map(c => `<span style="padding:1px 6px;border-radius:10px;font-size:9px;background:var(--ac-d);color:var(--ac);margin-right:3px">${esc(c)}</span>`).join('');
   return `<div class="mrow${m.isMissing?' mrow-miss':''}" data-id="${esc(m.id)}">
-    <input type="checkbox" class="mrow-cb mail-cb" data-id="${esc(m.id)}" onclick="updateMailSelection()">
+    <div class="cb-wrap"><input type="checkbox" class="mrow-cb mail-cb" data-id="${esc(m.id)}" onclick="updateMailSelection()"></div>
     <div class="mind ${indCls}"></div>
     <div class="mcust">${esc(m.custName)}</div>
     <div><div class="msubj">${esc(m.subject)}</div><div class="msend">${esc(m.sender)}${catBadges?' · '+catBadges:''}</div></div>
