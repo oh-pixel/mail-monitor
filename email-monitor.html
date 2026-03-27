@@ -185,6 +185,9 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
 .kw-col-title{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:500;margin-bottom:12px}
 .t-ok{color:var(--ok)}.t-wa{color:var(--wa)}.t-er{color:var(--er)}
 
+.cat-pill{padding:4px 12px;border-radius:20px;font-size:11px;border:1px solid var(--b2);color:var(--t3);background:transparent;cursor:pointer;transition:all .15s}
+.cat-pill.selected{background:var(--ac-d);border-color:rgba(99,102,241,0.4);color:var(--ac)}
+.cat-row{display:grid;grid-template-columns:1fr 2fr auto;gap:8px;align-items:center;padding:8px 12px;background:var(--s2);border-radius:var(--r)}
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px}
@@ -391,6 +394,12 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
       <span id="gh-status" style="font-size:12px;color:var(--t3)"></span>
     </div>
   </div>
+  <div style="background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:18px 20px;margin-bottom:22px">
+    <div style="font-size:13px;font-weight:500;color:var(--t1);margin-bottom:4px">Kategorien / Systeme</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:14px">Definiere Systeme wie BackupAssist, Veeam, PRTG etc. Diese können dann pro Kunde ausgewählt werden.</div>
+    <div id="cat-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+    <button class="btn" id="btn-add-cat">+ Kategorie hinzufügen</button>
+  </div>
   <div style="margin-bottom:20px;font-size:13px;color:var(--t2)">Keywords zur Klassifizierung der Betreffzeilen</div>
   <div class="kw-section">
     <div class="kw-col"><div class="kw-col-title t-ok">Erfolgreich</div><textarea id="s-ok" placeholder="Erfolgreich, Success, OK..." rows="4"></textarea><div class="form-hint">Kommagetrennte Keywords</div></div>
@@ -445,6 +454,11 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
         <label class="day-cb"><input type="checkbox" name="wd" value="6"> Sa</label>
         <label class="day-cb"><input type="checkbox" name="wd" value="0"> So</label>
       </div>
+    </div>
+    <div class="fg">
+      <label>Kategorien / Systeme</label>
+      <div id="cust-cat-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+      <div class="form-hint">Welche Systeme werden bei diesem Kunden überwacht?</div>
     </div>
     <div class="fg">
       <label>Überwachung aktiv ab (Startdatum)</label>
@@ -678,6 +692,7 @@ async function reload() {
       const cust = matchCustomer(m.subject, sender + ' ' + senderName);
       // Only classify if mail matches a known customer, otherwise unknown
       const status = cust ? classify(m.subject) : 'un';
+      const categories = matchCategory(m.subject, sender + ' ' + senderName);
       return {
         id: m.id,
         subject: m.subject||'(kein Betreff)',
@@ -686,6 +701,7 @@ async function reload() {
         status: status,
         custName: cust?.name||'–',
         custId: cust?.id||null,
+        categories: categories,
         isMissing: false
       };
     });
@@ -862,10 +878,11 @@ function mailRow(m){
   const st = m.isMissing?'missing':m.status;
   const indCls = {ok:'ok',wa:'wa',er:'er',missing:'mis',un:'un'}[st]||'un';
   const badge = {ok:'<span class="mbadge b-ok">Erfolgreich</span>',wa:'<span class="mbadge b-wa">Warnung</span>',er:'<span class="mbadge b-er">Fehler</span>',missing:'<span class="mbadge b-mis">Fehlend</span>',un:'<span class="mbadge b-un">Unbekannt</span>'}[st]||'';
+  const catBadges = (m.categories||[]).map(c => `<span style="padding:1px 6px;border-radius:10px;font-size:9px;background:var(--ac-d);color:var(--ac);margin-right:3px">${esc(c)}</span>`).join('');
   return `<div class="mrow${m.isMissing?' mrow-miss':''}">
     <div class="mind ${indCls}"></div>
     <div class="mcust">${esc(m.custName)}</div>
-    <div><div class="msubj">${esc(m.subject)}</div><div class="msend">${esc(m.sender)}</div></div>
+    <div><div class="msubj">${esc(m.subject)}</div><div class="msend">${esc(m.sender)}${catBadges?' · '+catBadges:''}</div></div>
     ${badge}
     <span class="mdate">${dateStr}</span>
   </div>`;
@@ -948,6 +965,7 @@ function openCustModal(id=null){
       document.getElementById('c-window').value=c.window||'day';
       document.getElementById('c-note').value=c.note||'';
       document.getElementById('c-startdate').value=c.startdate||'';
+      renderCustCatList(c.categories||[]);
       (c.workdays||[]).forEach(d=>{ const cb=document.querySelector(`input[name=wd][value="${d}"]`); if(cb)cb.checked=true; });
     }
   } else {
@@ -957,6 +975,7 @@ function openCustModal(id=null){
     document.getElementById('c-window').value='day';
     document.getElementById('c-note').value='';
     document.getElementById('c-startdate').value='';
+    renderCustCatList([]);
   }
   document.getElementById('cust-overlay').classList.add('open');
 }
@@ -975,7 +994,8 @@ function saveCustomer(){
     window:document.getElementById('c-window').value,
     workdays,
     note:document.getElementById('c-note').value.trim(),
-    startdate:document.getElementById('c-startdate').value||new Date().toISOString().slice(0,10)
+    startdate:document.getElementById('c-startdate').value||new Date().toISOString().slice(0,10),
+    categories:getSelectedCats()
   };
   const custs=getCustomers();
   if(editCustId){
@@ -1011,6 +1031,7 @@ function loadSettings(){
   const repoEl = document.getElementById('gh-repo');
   if (tokenEl && token) tokenEl.value = token;
   if (repoEl && repo) repoEl.value = repo;
+  renderCatList();
 }
 
 function saveSettings(){
@@ -1021,6 +1042,97 @@ function saveSettings(){
 }
 
 
+
+
+// ── KATEGORIEN ──
+const CAT_KEY = 'categories';
+
+function getCategories() {
+  return LS.get(CAT_KEY) || [];
+}
+
+function saveCategories(cats) {
+  LS.set(CAT_KEY, cats);
+}
+
+function renderCatList() {
+  const cats = getCategories();
+  const list = document.getElementById('cat-list');
+  if (!list) return;
+
+  if (!cats.length) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--t3)">Noch keine Kategorien definiert.</div>';
+    return;
+  }
+
+  list.innerHTML = cats.map((c, i) => `
+    <div class="cat-row">
+      <input type="text" value="${esc(c.name)}" placeholder="Name (z.B. BackupAssist)"
+        onchange="updateCat(${i}, 'name', this.value)"
+        style="padding:6px 9px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-size:12px;font-family:var(--mono)">
+      <input type="text" value="${esc(c.keywords)}" placeholder="Keywords kommagetrennt (z.B. BackupAssist, BA-Report)"
+        onchange="updateCat(${i}, 'keywords', this.value)"
+        style="padding:6px 9px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-size:12px;font-family:var(--mono)">
+      <button class="btn danger btn-sm" onclick="deleteCat(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function addCat() {
+  const cats = getCategories();
+  cats.push({id: 'cat_' + Date.now(), name: '', keywords: ''});
+  saveCategories(cats);
+  renderCatList();
+}
+
+function updateCat(idx, field, value) {
+  const cats = getCategories();
+  if (cats[idx]) {
+    cats[idx][field] = value;
+    saveCategories(cats);
+  }
+}
+
+function deleteCat(idx) {
+  const cats = getCategories();
+  cats.splice(idx, 1);
+  saveCategories(cats);
+  renderCatList();
+}
+
+function matchCategory(subject, sender) {
+  const s = (subject + ' ' + sender).toLowerCase();
+  const cats = getCategories();
+  const matched = cats.filter(c => {
+    const kws = (c.keywords||'').split(',').map(k => k.trim().toLowerCase()).filter(Boolean);
+    return kws.some(kw => kw && s.includes(kw));
+  });
+  return matched.map(c => c.name);
+}
+
+function renderCustCatList(selectedCats) {
+  const cats = getCategories();
+  const list = document.getElementById('cust-cat-list');
+  if (!list) return;
+
+  if (!cats.length) {
+    list.innerHTML = '<span style="font-size:11px;color:var(--t3)">Zuerst Kategorien in den Einstellungen definieren.</span>';
+    return;
+  }
+
+  list.innerHTML = cats.map(c => {
+    const isSelected = (selectedCats||[]).includes(c.id);
+    return `<button class="cat-pill${isSelected?' selected':''}" data-catid="${c.id}" onclick="toggleCustCat(this)">${esc(c.name)||'(unbenannt)'}</button>`;
+  }).join('');
+}
+
+function toggleCustCat(el) {
+  el.classList.toggle('selected');
+}
+
+function getSelectedCats() {
+  return [...document.querySelectorAll('#cust-cat-list .cat-pill.selected')].map(el => el.dataset.catid);
+}
 
 // ── GITHUB KUNDEN-SYNC ──
 const GH_TOKEN_KEY = 'gh_token';
@@ -1327,7 +1439,7 @@ window.showTab=showTab; window.setDashFilter=setDashFilter;
 window.setMailFilter=setMailFilter; window.renderMailList=renderMailList;
 window.openCustModal=openCustModal; window.closeCustModal=closeCustModal;
 window.saveCustomer=saveCustomer; window.deleteCustomer=deleteCustomer;
-window.saveSettings=saveSettings; window.loadSettings=loadSettings;
+window.saveSettings=saveSettings; window.loadSettings=loadSettings; window.updateCat=updateCat; window.deleteCat=deleteCat; window.toggleCustCat=toggleCustCat;
 
 
 // Setup all event listeners after DOM ready
@@ -1356,6 +1468,7 @@ setTimeout(function setupEvents() {
   // Settings
   document.getElementById('btn-save-settings')?.addEventListener('click', function(){ saveSettings(); });
   document.getElementById('btn-reeval')?.addEventListener('click', function(){ reload(); });
+  document.getElementById('btn-add-cat')?.addEventListener('click', function(){ addCat(); });
   document.getElementById('btn-save-gh')?.addEventListener('click', function(){ saveGHConfig(); });
   document.getElementById('btn-test-gh')?.addEventListener('click', function(){ testGHConnection(); });
 
