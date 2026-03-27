@@ -422,6 +422,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
   <div style="display:flex;gap:10px">
     <button class="btn prim" id="btn-save-settings">Einstellungen speichern</button>
     <button class="btn" id="btn-reeval">Neu auswerten</button>
+    <button class="btn danger" id="btn-delete-unknown">Unbekannte E-Mails löschen</button>
   </div>
 </div>
 
@@ -1644,6 +1645,19 @@ function setDBFilter(f, el) {
   renderDBView();
 }
 
+function deleteUnknownFromDB() {
+  const db = getDB();
+  const before = db.length;
+  const filtered = db.filter(m => m.status !== 'un');
+  const removed = before - filtered.length;
+  if (removed === 0) { toast('Keine unbekannten E-Mails in der Datenbank.', 'suc'); return; }
+  if (!confirm(removed + ' unbekannte E-Mail(s) aus der Datenbank löschen?')) return;
+  saveDB(filtered);
+  toast(removed + ' unbekannte E-Mail(s) gelöscht.', 'suc');
+  renderDBView();
+  updateAll();
+}
+
 // ── TABS ──
 function showTab(name, el=null){
   ['dashboard','customers','mails','settings','db'].forEach(t=>{
@@ -1674,7 +1688,7 @@ window.showTab=showTab; window.setDashFilter=setDashFilter;
 window.setMailFilter=setMailFilter; window.renderMailList=renderMailList;
 window.openCustModal=openCustModal; window.closeCustModal=closeCustModal;
 window.saveCustomer=saveCustomer; window.deleteCustomer=deleteCustomer;
-window.saveSettings=saveSettings; window.loadSettings=loadSettings; window.updateCat=updateCat; window.deleteCat=deleteCat;
+window.saveSettings=saveSettings; window.loadSettings=loadSettings; window.deleteUnknownFromDB=deleteUnknownFromDB; window.updateCat=updateCat; window.deleteCat=deleteCat;
 window.updateRule=updateRule; window.deleteRule=deleteRule; window.addRule=addRule;
 
 
@@ -1702,6 +1716,7 @@ setTimeout(function setupEvents() {
 
   // Settings
   document.getElementById('btn-save-settings')?.addEventListener('click', function(){ saveSettings(); });
+  document.getElementById('btn-delete-unknown')?.addEventListener('click', function(){ deleteUnknownFromDB(); });
   document.getElementById('btn-reeval')?.addEventListener('click', function(){ reload(); });
   document.getElementById('btn-add-cat')?.addEventListener('click', function(){ addCat(); });
   document.getElementById('btn-add-rule')?.addEventListener('click', function(){ addRule(); });
