@@ -663,6 +663,8 @@ async function onLogin(acc) {
     if (ghSettings.kw_ok) LS.set('kw_ok', ghSettings.kw_ok);
     if (ghSettings.kw_wa) LS.set('kw_wa', ghSettings.kw_wa);
     if (ghSettings.kw_er) LS.set('kw_er', ghSettings.kw_er);
+    if (ghSettings.categories) LS.set(CAT_KEY, JSON.stringify(ghSettings.categories));
+    toast('Einstellungen & Kategorien von GitHub geladen.', 'suc');
   }
 
   // Load customers from GitHub if configured
@@ -1098,8 +1100,9 @@ function saveSettings(){
   LS.set('kw_ok', kw_ok);
   LS.set('kw_wa', kw_wa);
   LS.set('kw_er', kw_er);
-  // Save to GitHub
-  saveSettingsToGH({kw_ok, kw_wa, kw_er});
+  // Save to GitHub including categories
+  const categories = getCategories();
+  saveSettingsToGH({kw_ok, kw_wa, kw_er, categories});
   toast('Einstellungen gespeichert.','suc');
 }
 
@@ -1187,6 +1190,12 @@ function getCategories() {
 
 function saveCategories(cats) {
   LS.set(CAT_KEY, cats);
+  saveSettingsToGH({
+    kw_ok: LS.get('kw_ok') || '',
+    kw_wa: LS.get('kw_wa') || '',
+    kw_er: LS.get('kw_er') || '',
+    categories: cats
+  });
 }
 
 function renderCatList() {
