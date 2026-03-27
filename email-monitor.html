@@ -434,6 +434,11 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
       </div>
     </div>
     <div class="fg">
+      <label>Überwachung aktiv ab (Startdatum)</label>
+      <input type="date" id="c-startdate" style="width:100%;padding:8px 11px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-family:var(--font);font-size:12px">
+      <div class="form-hint">Fehlende E-Mails werden erst ab diesem Datum gemeldet.</div>
+    </div>
+    <div class="fg">
       <label>Notiz (optional)</label>
       <textarea id="c-note" placeholder="z.B. Backup läuft um 03:00 Uhr..."></textarea>
     </div>
@@ -513,6 +518,7 @@ function buildMissingEntries(mails, days) {
     const window = c.window || 'day';
     const expected = parseInt(c.count) || 1;
     const workdays = (c.workdays||[]).map(Number);
+    const startdate = c.startdate ? new Date(c.startdate) : null;
 
     // Build time slots
     const slots = [];
@@ -520,6 +526,8 @@ function buildMissingEntries(mails, days) {
       for (let i=0; i<days; i++) {
         const d = new Date(now);
         d.setDate(d.getDate()-i);
+        // Skip days before start date
+        if (startdate && d < startdate) continue;
         const wd = d.getDay();
         if (workdays.length===0 || workdays.includes(wd)) {
           const dayStr = d.toISOString().slice(0,10);
@@ -839,7 +847,7 @@ function renderCustomerGrid(){
       <div class="cc-top">
         <div>
           <div class="cc-name">${esc(c.name)}</div>
-          <div class="cc-kw">${c.count}× ${wlbl}${c.workdays?.length?' · '+formatDays(c.workdays):''}</div>
+          <div class="cc-kw">${c.count}× ${wlbl}${c.workdays?.length?' · '+formatDays(c.workdays):''}${c.startdate?' · ab '+c.startdate:''}</div>
         </div>
         <div class="cc-status">
           ${dot}
@@ -888,6 +896,7 @@ function openCustModal(id=null){
       document.getElementById('c-count').value=c.count||1;
       document.getElementById('c-window').value=c.window||'day';
       document.getElementById('c-note').value=c.note||'';
+      document.getElementById('c-startdate').value=c.startdate||'';
       (c.workdays||[]).forEach(d=>{ const cb=document.querySelector(`input[name=wd][value="${d}"]`); if(cb)cb.checked=true; });
     }
   } else {
@@ -896,6 +905,7 @@ function openCustModal(id=null){
     document.getElementById('c-count').value=1;
     document.getElementById('c-window').value='day';
     document.getElementById('c-note').value='';
+    document.getElementById('c-startdate').value='';
   }
   document.getElementById('cust-overlay').classList.add('open');
 }
@@ -913,7 +923,8 @@ function saveCustomer(){
     count:parseInt(document.getElementById('c-count').value)||1,
     window:document.getElementById('c-window').value,
     workdays,
-    note:document.getElementById('c-note').value.trim()
+    note:document.getElementById('c-note').value.trim(),
+    startdate:document.getElementById('c-startdate').value||new Date().toISOString().slice(0,10)
   };
   const custs=getCustomers();
   if(editCustId){
