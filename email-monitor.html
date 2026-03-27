@@ -945,22 +945,18 @@ function openCustModal(id=null){
     if(c){
       document.getElementById('c-name').value=c.name||'';
       document.getElementById('c-alias').value=c.alias||'';
-      document.getElementById('c-count').value=c.count||1;
-      document.getElementById('c-window').value=c.window||'day';
       document.getElementById('c-note').value=c.note||'';
       document.getElementById('c-startdate').value=c.startdate||'';
-      renderCustCatList(c.categories||[]);
-      (c.workdays||[]).forEach(d=>{ const cb=document.querySelector(`input[name=wd][value="${d}"]`); if(cb)cb.checked=true; });
+      currentRules = JSON.parse(JSON.stringify(c.rules||[]));
     }
   } else {
     document.getElementById('c-name').value='';
     document.getElementById('c-alias').value='';
-    document.getElementById('c-count').value=1;
-    document.getElementById('c-window').value='day';
     document.getElementById('c-note').value='';
     document.getElementById('c-startdate').value='';
-    renderCustCatList([]);
+    currentRules = [];
   }
+  renderRulesList(currentRules);
   document.getElementById('cust-overlay').classList.add('open');
 }
 
