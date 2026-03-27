@@ -904,7 +904,7 @@ window.saveSettings=saveSettings; window.loadSettings=loadSettings;
 
 
 // Setup all event listeners after DOM ready
-(function setupEvents() {
+setTimeout(function setupEvents() {
   console.log('SETUP RUNNING - logout btn:', document.getElementById("btn-logout") ? "found" : "NOT FOUND");
   // Nav tabs
   document.getElementById('nav-dashboard')?.addEventListener('click', function(){ showTab('dashboard', this); });
@@ -942,7 +942,7 @@ window.saveSettings=saveSettings; window.loadSettings=loadSettings;
   document.getElementById('cust-overlay')?.addEventListener('click', function(e){ if(e.target===this) closeCustModal(); });
 
   setTimeout(() => initMsal(), 500);
-})();
+}, 100);
 
 </script>
 
