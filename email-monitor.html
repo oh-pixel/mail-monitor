@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mail Monitor v1.3.1</title>
+<title>Mail Monitor v1.3.2</title>
 <script src="msal-browser.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <style>
@@ -206,7 +206,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
   <div class="hright">
     <div style="display:flex;flex-direction:column;align-items:flex-end;margin-right:12px">
       <span style="font-size:13px;font-weight:500;color:var(--t1);letter-spacing:-0.01em">Mail Monitor</span>
-      <span style="font-size:10px;color:var(--t3)">v1.3.1</span>
+      <span style="font-size:10px;color:var(--t3)">v1.3.2</span>
     </div>
     <div class="upill" id="upill" style="display:none"><div class="udot"></div><span id="uname">–</span></div>
     <button class="btn" id="btn-cfg" data-tab="'settings')" style="display:none">Einstellungen</button>
@@ -300,9 +300,6 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
   <div class="cust-toolbar">
     <span style="font-size:13px;color:var(--t2)" id="cust-summary">–</span>
     <div style="display:flex;gap:8px">
-        <button class="btn" id="btn-cust-export">Backup exportieren</button>
-        <button class="btn" id="btn-cust-import">Backup importieren</button>
-        <input type="file" id="cust-import-file" accept=".json" style="display:none">
         <button class="btn prim" id="btn-add-cust">+ Kunde hinzufügen</button>
       </div>
   </div>
@@ -746,7 +743,6 @@ async function reload() {
     // Auto-save new mails to DB
     syncNewMails(allMails);
     updateDBBadge();
-  setAutoSync(5);
 
     // Merge with DB so deleted mails from inbox still show
     const db = getDB();
@@ -1257,29 +1253,7 @@ function matchCategory(subject, sender) {
   return matched.map(c => c.name);
 }
 
-function renderCustCatList(selectedCats) {
-  const cats = getCategories();
-  const list = document.getElementById('cust-cat-list');
-  if (!list) return;
 
-  if (!cats.length) {
-    list.innerHTML = '<span style="font-size:11px;color:var(--t3)">Zuerst Kategorien in den Einstellungen definieren.</span>';
-    return;
-  }
-
-  list.innerHTML = cats.map(c => {
-    const isSelected = (selectedCats||[]).includes(c.id);
-    return `<button class="cat-pill${isSelected?' selected':''}" data-catid="${c.id}" onclick="toggleCustCat(this)">${esc(c.name)||'(unbenannt)'}</button>`;
-  }).join('');
-}
-
-function toggleCustCat(el) {
-  el.classList.toggle('selected');
-}
-
-function getSelectedCats() {
-  return [...document.querySelectorAll('#cust-cat-list .cat-pill.selected')].map(el => el.dataset.catid);
-}
 
 
 const GH_TOKEN_KEY = 'gh_token';
@@ -1694,32 +1668,18 @@ function toast(msg,type='err'){
 
 
 
-// Expose all functions globally for onclick handlers
-window.login = login;
-window.logout = logout;
-window.reload = reload;
-window.showTab = showTab;
-window.setDashFilter = setDashFilter;
-window.setMailFilter = setMailFilter;
-window.openCustModal = openCustModal;
-window.closeCustModal = closeCustModal;
-window.saveCustomer = saveCustomer;
-window.deleteCustomer = deleteCustomer;
-window.saveSettings = saveSettings;
-
-// Init after everything loaded
-// Make all functions explicitly global
+// Expose all functions globally
 window.login=login; window.logout=logout; window.reload=reload;
 window.showTab=showTab; window.setDashFilter=setDashFilter;
 window.setMailFilter=setMailFilter; window.renderMailList=renderMailList;
 window.openCustModal=openCustModal; window.closeCustModal=closeCustModal;
 window.saveCustomer=saveCustomer; window.deleteCustomer=deleteCustomer;
-window.saveSettings=saveSettings; window.loadSettings=loadSettings; window.updateCat=updateCat; window.deleteCat=deleteCat; window.toggleCustCat=toggleCustCat; window.updateRule=updateRule; window.deleteRule=deleteRule; window.addRule=addRule;
+window.saveSettings=saveSettings; window.loadSettings=loadSettings; window.updateCat=updateCat; window.deleteCat=deleteCat;
+window.updateRule=updateRule; window.deleteRule=deleteRule; window.addRule=addRule;
 
 
 // Setup all event listeners after DOM ready
 setTimeout(function setupEvents() {
-  console.log('SETUP RUNNING - logout btn:', document.getElementById("btn-logout") ? "found" : "NOT FOUND");
   // Nav tabs
   document.getElementById('nav-dashboard')?.addEventListener('click', function(){ showTab('dashboard', this); });
   document.getElementById('nav-customers')?.addEventListener('click', function(){ showTab('customers', this); });
