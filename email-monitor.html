@@ -85,6 +85,7 @@ select:focus{outline:none;border-color:var(--ac)}
 .sc.c-er .sval{color:var(--er)}
 .sc.c-mis .sval{color:#a855f7}
 .sc.c-un .sval{color:var(--t2)}
+.sc[style*="cursor:pointer"]:hover{border-color:var(--b3);background:var(--s2)}
 .ssub{font-size:10px;color:var(--t3);margin-top:3px}
 
 /* CHARTS */
@@ -762,12 +763,12 @@ function renderStats() {
   const c = counts();
   const pct = v => c.total>0?Math.round(v/c.total*100)+'%':'–';
   document.getElementById('stats-row').innerHTML=`
-    <div class="sc c-tot"><div class="slbl">Gesamt</div><div class="sval">${c.total}</div><div class="ssub">E-Mails im Zeitraum</div></div>
-    <div class="sc c-ok"><div class="slbl">Erfolgreich</div><div class="sval">${c.ok}</div><div class="ssub">${pct(c.ok)}</div></div>
-    <div class="sc c-wa"><div class="slbl">Warnungen</div><div class="sval">${c.wa}</div><div class="ssub">${pct(c.wa)}</div></div>
-    <div class="sc c-er"><div class="slbl">Fehler</div><div class="sval">${c.er}</div><div class="ssub">${pct(c.er)}</div></div>
-    <div class="sc c-mis"><div class="slbl">Fehlende E-Mails</div><div class="sval">${c.mis}</div><div class="ssub">${c.mis>0?'Nicht eingegangen':'Alle erhalten'}</div></div>
-    <div class="sc c-un"><div class="slbl">Unbekannt</div><div class="sval">${c.un}</div><div class="ssub">Kein passendes Keyword</div></div>
+    <div class="sc c-tot" style="cursor:pointer" onclick="setDashFilter('all', document.querySelector('#dash-ftabs .ft')); document.getElementById('dash-list').scrollIntoView({behavior:'smooth', block:'nearest'})"><div class="slbl">Gesamt</div><div class="sval">${c.total}</div><div class="ssub">E-Mails im Zeitraum</div></div>
+    <div class="sc c-ok" style="cursor:pointer" onclick="setDashFilter('ok', document.querySelector('#dash-ftabs .ft.ok')); document.getElementById('dash-list').scrollIntoView({behavior:'smooth', block:'nearest'})"><div class="slbl">Erfolgreich</div><div class="sval">${c.ok}</div><div class="ssub">${pct(c.ok)}</div></div>
+    <div class="sc c-wa" style="cursor:pointer" onclick="setDashFilter('wa', document.querySelector('#dash-ftabs .ft.wa')); document.getElementById('dash-list').scrollIntoView({behavior:'smooth', block:'nearest'})"><div class="slbl">Warnungen</div><div class="sval">${c.wa}</div><div class="ssub">${pct(c.wa)}</div></div>
+    <div class="sc c-er" style="cursor:pointer" onclick="setDashFilter('er', document.querySelector('#dash-ftabs .ft.er')); document.getElementById('dash-list').scrollIntoView({behavior:'smooth', block:'nearest'})"><div class="slbl">Fehler</div><div class="sval">${c.er}</div><div class="ssub">${pct(c.er)}</div></div>
+    <div class="sc c-mis" style="cursor:pointer" onclick="setDashFilter('missing', document.querySelector('#dash-ftabs .ft.mis')); document.getElementById('dash-list').scrollIntoView({behavior:'smooth', block:'nearest'})"><div class="slbl">Fehlende E-Mails</div><div class="sval">${c.mis}</div><div class="ssub">${c.mis>0?'Nicht eingegangen':'Alle erhalten'}</div></div>
+    <div class="sc c-un" style="cursor:pointer" onclick="setDashFilter('un', document.querySelector('#dash-ftabs .ft:last-child')); document.getElementById('dash-list').scrollIntoView({behavior:'smooth', block:'nearest'})"><div class="slbl">Unbekannt</div><div class="sval">${c.un}</div><div class="ssub">Kein passendes Keyword</div></div>
   `;
 }
 
