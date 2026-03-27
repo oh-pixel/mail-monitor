@@ -663,7 +663,7 @@ async function onLogin(acc) {
     if (ghSettings.kw_ok) LS.set('kw_ok', ghSettings.kw_ok);
     if (ghSettings.kw_wa) LS.set('kw_wa', ghSettings.kw_wa);
     if (ghSettings.kw_er) LS.set('kw_er', ghSettings.kw_er);
-    if (ghSettings.categories) LS.set(CAT_KEY, JSON.stringify(ghSettings.categories));
+    if (ghSettings.categories) LS.set(CAT_KEY, Array.isArray(ghSettings.categories) ? JSON.stringify(ghSettings.categories) : ghSettings.categories);
     toast('Einstellungen & Kategorien von GitHub geladen.', 'suc');
   }
 
@@ -1185,7 +1185,11 @@ function getRulesFromForm() {
 const CAT_KEY = 'categories';
 
 function getCategories() {
-  return LS.get(CAT_KEY) || [];
+  try {
+    const val = LS.get(CAT_KEY);
+    if (!val) return [];
+    return Array.isArray(val) ? val : JSON.parse(val);
+  } catch(e) { return []; }
 }
 
 function saveCategories(cats) {
