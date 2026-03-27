@@ -345,7 +345,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
       <span>Auto-Sync:</span>
       <select id="autosync-interval" style="font-size:12px">
         <option value="0">Deaktiviert</option>
-        <option value="5">Alle 5 Min</option>
+        <option value="5" selected>Alle 5 Min</option>
         <option value="15">Alle 15 Min</option>
         <option value="30">Alle 30 Min</option>
         <option value="60">Alle 60 Min</option>
@@ -355,7 +355,14 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
       <span style="width:8px;height:8px;border-radius:50%;background:var(--t3);display:inline-block" id="autosync-dot"></span>
       <span id="autosync-status">Inaktiv</span>
     </div>
-    <div style="font-size:11px;color:var(--t3)">Speichernutzung: <span id="db-storage">–</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-size:11px;color:var(--t3)">GitHub Grösse:</div>
+        <span id="db-storage" style="font-size:12px;font-family:var(--mono);font-weight:500;color:var(--t1)">–</span>
+        <div id="db-size-bar-wrap" style="width:120px;height:6px;background:var(--s2);border-radius:3px;overflow:hidden">
+          <div id="db-size-bar" style="height:100%;border-radius:3px;background:var(--ok);width:0%;transition:width 0.3s"></div>
+        </div>
+        <span id="db-size-pct" style="font-size:11px;color:var(--t3)">0% von 100MB</span>
+      </div>
   </div>
   <div class="mc">
     <div class="mc-head">
@@ -705,6 +712,7 @@ async function reload() {
     // Auto-save new mails to DB
     syncNewMails(allMails);
     updateDBBadge();
+  setAutoSync(5);
 
     // Merge with DB so deleted mails from inbox still show
     const db = getDB();
@@ -1439,6 +1447,7 @@ function clearDB() {
   toast('Datenbank geleert.', 'suc');
   renderDBView();
   updateDBBadge();
+  setAutoSync(5);
 }
 
 function exportCSV() {
@@ -1481,6 +1490,7 @@ function setAutoSync(minutes) {
       const db = syncNewMails(allMails);
       renderDBView();
       updateDBBadge();
+  setAutoSync(5);
     } catch(e) { console.error('Auto-sync error:', e); }
   }, minutes * 60 * 1000);
 }
@@ -1508,11 +1518,23 @@ function renderDBView() {
   const storageEl = document.getElementById('db-storage');
   if (storageEl) {
     const size = new Blob([localStorage.getItem(DB_KEY)||'']).size;
-    const {repo} = getGHConfig();
-    const ghStatus = repo ? ' · GitHub: ' + repo + '/datenbank.json' : ' · Kein GitHub konfiguriert';
-    storageEl.textContent = (size > 1024*1024
-      ? (size/1024/1024).toFixed(1) + ' MB'
-      : Math.round(size/1024) + ' KB') + ghStatus;
+    const sizeMB = size / 1024 / 1024;
+    const pct = Math.min(100, (sizeMB / 100) * 100);
+
+    storageEl.textContent = sizeMB >= 1
+      ? sizeMB.toFixed(2) + ' MB'
+      : Math.round(size / 1024) + ' KB';
+
+    const bar = document.getElementById('db-size-bar');
+    const pctEl = document.getElementById('db-size-pct');
+    if (bar) {
+      bar.style.width = pct + '%';
+      bar.style.background = pct > 80 ? 'var(--er)' : pct > 50 ? 'var(--wa)' : 'var(--ok)';
+    }
+    if (pctEl) {
+      pctEl.textContent = pct.toFixed(1) + '% von 100MB';
+      pctEl.style.color = pct > 80 ? 'var(--er)' : pct > 50 ? 'var(--wa)' : 'var(--t3)';
+    }
   }
 
   // Filter
@@ -1639,12 +1661,14 @@ setTimeout(function setupEvents() {
     syncNewMails(allMails);
     renderDBView();
     updateDBBadge();
+  setAutoSync(5);
   });
   document.getElementById('btn-db-sync-full')?.addEventListener('click', async function(){
     await reload();
     fullSyncMails(allMails);
     renderDBView();
     updateDBBadge();
+  setAutoSync(5);
   });
   document.getElementById('btn-db-export')?.addEventListener('click', function(){ exportCSV(); });
   document.getElementById('btn-db-clear')?.addEventListener('click', function(){ clearDB(); });
@@ -1657,8 +1681,10 @@ setTimeout(function setupEvents() {
   });
 
   updateDBBadge();
+  setAutoSync(5);
 
   setTimeout(() => initMsal(), 500);
+  setTimeout(() => setAutoSync(5), 1000);
 }, 100);
 
 </script>
