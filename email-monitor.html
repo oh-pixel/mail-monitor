@@ -1278,9 +1278,13 @@ function getSelectedCats() {
 }
 
 
+const GH_TOKEN_KEY = 'gh_token';
+const GH_REPO_KEY = 'gh_repo';
+
 // ── EINSTELLUNGEN AUF GITHUB ──
 async function loadSettingsFromGH() {
-  const {token, repo} = getGHConfig();
+  const token = localStorage.getItem('gh_token') || '';
+  const repo = localStorage.getItem('gh_repo') || '';
   if (!token || !repo) return null;
   try {
     const res = await fetch(`https://api.github.com/repos/${repo}/contents/einstellungen.json`, {
@@ -1297,8 +1301,11 @@ async function loadSettingsFromGH() {
   }
 }
 
+
+
 async function saveSettingsToGH(settings) {
-  const {token, repo} = getGHConfig();
+  const token = localStorage.getItem('gh_token') || '';
+  const repo = localStorage.getItem('gh_repo') || '';
   if (!token || !repo) return;
   try {
     let sha = null;
@@ -1328,8 +1335,6 @@ async function saveSettingsToGH(settings) {
 }
 
 // ── GITHUB KUNDEN-SYNC ──
-const GH_TOKEN_KEY = 'gh_token';
-const GH_REPO_KEY = 'gh_repo';
 const GH_FILE = 'kunden.json';
 
 function getGHConfig() {
