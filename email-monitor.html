@@ -725,7 +725,9 @@ async function reload() {
       url = d['@odata.nextLink']||null;
     }
     const custs = getCustomers();
-    allMails = raw.map(m => {
+    const bl = getBlacklist();
+    const filteredRaw = raw.filter(m => !bl.has(m.id));
+    allMails = filteredRaw.map(m => {
       const sender = m.from?.emailAddress?.address||'';
       const senderName = m.from?.emailAddress?.name||'';
       const cust = matchCustomer(m.subject, sender + ' ' + senderName);
@@ -1663,6 +1665,24 @@ function deleteUnknownFromDB() {
 }
 
 
+
+// ── BLACKLIST ──
+const BL_KEY = 'mailmonitor_blacklist';
+
+function getBlacklist() {
+  try { return new Set(JSON.parse(localStorage.getItem(BL_KEY)) || []); } catch { return new Set(); }
+}
+
+function addToBlacklist(ids) {
+  const bl = getBlacklist();
+  ids.forEach(id => bl.add(id));
+  localStorage.setItem(BL_KEY, JSON.stringify([...bl]));
+}
+
+function isBlacklisted(id) {
+  return getBlacklist().has(id);
+}
+
 // ── MAIL SELECTION & DELETE ──
 function updateMailSelection() {
   const cbs = document.querySelectorAll('#mail-list .mail-cb');
@@ -1685,14 +1705,16 @@ function toggleSelectAll() {
 function deleteSelectedMails() {
   const checked = document.querySelectorAll('#mail-list .mail-cb:checked');
   if (!checked.length) return;
-  if (!confirm(checked.length + ' E-Mail(s) aus der Datenbank löschen?')) return;
+  if (!confirm(checked.length + ' E-Mail(s) dauerhaft aus der App entfernen?')) return;
   const ids = new Set([...checked].map(cb => cb.dataset.id));
+  // Add to blacklist so they won't reappear after sync
+  addToBlacklist([...ids]);
   const db = getDB();
   const filtered = db.filter(m => !ids.has(m.id));
   saveDB(filtered);
   // Also remove from allMails
   allMails = allMails.filter(m => !ids.has(m.id));
-  toast(ids.size + ' E-Mail(s) gelöscht.', 'suc');
+  toast(ids.size + ' E-Mail(s) dauerhaft entfernt.', 'suc');
   updateAll();
 }
 
