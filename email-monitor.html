@@ -247,7 +247,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <span class="sync-lbl" id="sync-lbl">–</span>
-      <button class="btn prim" onclick="reload()" id="rbtn">↻ Aktualisieren</button>
+      <button class="btn prim" id="rbtn">↻ Aktualisieren</button>
     </div>
   </div>
   <div class="stats" id="stats-row"></div>
@@ -258,11 +258,11 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
   <div class="mc">
     <div class="mc-head">
       <div class="ftabs" id="dash-ftabs">
-        <button class="ft a" onclick="setDashFilter('all',this)">Alle</button>
-        <button class="ft ok" onclick="setDashFilter('ok',this)">Erfolgreich</button>
-        <button class="ft wa" onclick="setDashFilter('wa',this)">Warnungen</button>
-        <button class="ft er" onclick="setDashFilter('er',this)">Fehler</button>
-        <button class="ft mis" onclick="setDashFilter('missing',this)">Fehlend</button>
+        <button class="ft a" data-filter="all" data-target="dash">Alle</button>
+        <button class="ft ok" data-filter="ok" data-target="dash">Erfolgreich</button>
+        <button class="ft wa" data-filter="wa" data-target="dash">Warnungen</button>
+        <button class="ft er" data-filter="er" data-target="dash">Fehler</button>
+        <button class="ft mis" data-filter="missing" data-target="dash">Fehlend</button>
       </div>
       <span class="mcnt" id="dash-cnt">–</span>
     </div>
@@ -274,7 +274,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
 <div id="v-customers" style="display:none">
   <div class="cust-toolbar">
     <span style="font-size:13px;color:var(--t2)" id="cust-summary">–</span>
-    <button class="btn prim" onclick="openCustModal()">+ Kunde hinzufügen</button>
+    <button class="btn prim" id="btn-add-cust">+ Kunde hinzufügen</button>
   </div>
   <div class="cust-grid" id="cust-grid"></div>
 </div>
@@ -284,11 +284,11 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
   <div class="toolbar">
     <div class="tl">
       <div class="ftabs" id="mail-ftabs">
-        <button class="ft a" onclick="setMailFilter('all',this)">Alle</button>
-        <button class="ft ok" onclick="setMailFilter('ok',this)">Erfolgreich</button>
-        <button class="ft wa" onclick="setMailFilter('wa',this)">Warnungen</button>
-        <button class="ft er" onclick="setMailFilter('er',this)">Fehler</button>
-        <button class="ft mis" onclick="setMailFilter('missing',this)">Fehlend</button>
+        <button class="ft a" data-filter="all" data-target="mail">Alle</button>
+        <button class="ft ok" data-filter="ok" data-target="mail">Erfolgreich</button>
+        <button class="ft wa" data-filter="wa" data-target="mail">Warnungen</button>
+        <button class="ft er" data-filter="er" data-target="mail">Fehler</button>
+        <button class="ft mis" data-filter="missing" data-target="mail">Fehlend</button>
       </div>
     </div>
     <input class="search-inp" type="text" placeholder="Betreff / Kunde suchen..." id="mail-search" oninput="renderMailList()">
@@ -310,8 +310,8 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
     <div class="kw-col"><div class="kw-col-title t-er">Fehler</div><textarea id="s-er" placeholder="Fehler, Error, Failed..." rows="4"></textarea><div class="form-hint">Kommagetrennte Keywords</div></div>
   </div>
   <div style="display:flex;gap:10px">
-    <button class="btn prim" onclick="saveSettings()">Einstellungen speichern</button>
-    <button class="btn" onclick="reload()">Neu auswerten</button>
+    <button class="btn prim" id="btn-save-settings">Einstellungen speichern</button>
+    <button class="btn" id="btn-reeval">Neu auswerten</button>
   </div>
 </div>
 
@@ -363,9 +363,9 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
       <textarea id="c-note" placeholder="z.B. Backup läuft um 03:00 Uhr..."></textarea>
     </div>
     <div class="mfooter">
-      <button class="btn" onclick="closeCustModal()">Abbrechen</button>
-      <button class="btn danger" id="c-del-btn" onclick="deleteCustomer()" style="display:none">Löschen</button>
-      <button class="btn prim" onclick="saveCustomer()">Speichern</button>
+      <button class="btn" id="btn-cancel-cust">Abbrechen</button>
+      <button class="btn danger" id="c-del-btn" id="c-del-btn" style="display:none">Löschen</button>
+      <button class="btn prim" id="btn-save-cust">Speichern</button>
     </div>
   </div>
 </div>
@@ -377,7 +377,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
 //   KONFIGURATION
 // ═══════════════════════════════════════════════
 const CLIENT_ID = "caa4a8cc-262a-4852-a95e-c8b7b8705673";
-const TENANT_ID = "3a992295-f65c-4cec-a31a-87024a0c2785";
+const TENANT_ID = "common";
 // ═══════════════════════════════════════════════
 
 const REDIRECT_URI = "https://oh-pixel.github.io/mail-monitor/email-monitor.html";
@@ -748,7 +748,7 @@ function renderCustomerGrid(){
         <div class="cc-status">
           ${dot}
           <div class="cc-actions">
-            <button class="icon-btn" onclick="openCustModal('${c.id}')" title="Bearbeiten">✎</button>
+            <button class="icon-btn" onclick="window.openCustModal('${c.id}')" title="Bearbeiten">✎</button>
           </div>
         </div>
       </div>
@@ -878,8 +878,7 @@ function toast(msg,type='err'){
   setTimeout(()=>t.classList.remove('show'),4000);
 }
 
-// Close modal on overlay click
-document.getElementById('cust-overlay').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeCustModal(); });
+
 
 // Expose all functions globally for onclick handlers
 window.login = login;
@@ -903,11 +902,48 @@ window.openCustModal=openCustModal; window.closeCustModal=closeCustModal;
 window.saveCustomer=saveCustomer; window.deleteCustomer=deleteCustomer;
 window.saveSettings=saveSettings; window.loadSettings=loadSettings;
 
-// Attach login button listener
-document.getElementById('ms-login-btn').addEventListener('click', () => login());
 
-// Init MSAL after short delay to ensure library is ready
-setTimeout(() => initMsal(), 500);
+// Setup all event listeners after DOM ready
+(function setupEvents() {
+  console.log('SETUP RUNNING - logout btn:', document.getElementById("btn-logout") ? "found" : "NOT FOUND");
+  // Nav tabs
+  document.getElementById('nav-dashboard')?.addEventListener('click', function(){ showTab('dashboard', this); });
+  document.getElementById('nav-customers')?.addEventListener('click', function(){ showTab('customers', this); });
+  document.getElementById('nav-mails')?.addEventListener('click', function(){ showTab('mails', this); });
+  document.getElementById('nav-settings')?.addEventListener('click', function(){ showTab('settings', this); });
+
+  // Header buttons
+  document.getElementById('btn-cfg')?.addEventListener('click', function(){ showTab('settings', document.getElementById('nav-settings')); });
+  document.getElementById('btn-logout')?.addEventListener('click', function(){ logout(); });
+  document.getElementById('ms-login-btn')?.addEventListener('click', function(){ login(); });
+
+  // Dashboard
+  document.getElementById('rbtn')?.addEventListener('click', function(){ reload(); });
+
+  // Customers
+  document.getElementById('btn-add-cust')?.addEventListener('click', function(){ openCustModal(); });
+  document.getElementById('btn-cancel-cust')?.addEventListener('click', function(){ closeCustModal(); });
+  document.getElementById('c-del-btn')?.addEventListener('click', function(){ deleteCustomer(); });
+  document.getElementById('btn-save-cust')?.addEventListener('click', function(){ saveCustomer(); });
+
+  // Settings
+  document.getElementById('btn-save-settings')?.addEventListener('click', function(){ saveSettings(); });
+  document.getElementById('btn-reeval')?.addEventListener('click', function(){ reload(); });
+
+  // Filter tabs
+  document.querySelectorAll('[data-filter][data-target="dash"]').forEach(function(btn) {
+    btn.addEventListener('click', function(){ setDashFilter(this.dataset.filter, this); });
+  });
+  document.querySelectorAll('[data-filter][data-target="mail"]').forEach(function(btn) {
+    btn.addEventListener('click', function(){ setMailFilter(this.dataset.filter, this); });
+  });
+
+  // Modal overlay click
+  document.getElementById('cust-overlay')?.addEventListener('click', function(e){ if(e.target===this) closeCustModal(); });
+
+  setTimeout(() => initMsal(), 500);
+})();
+
 </script>
 
 <!--
