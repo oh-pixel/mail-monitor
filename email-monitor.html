@@ -672,12 +672,14 @@ async function reload() {
     const custs = getCustomers();
     allMails = raw.map(m => {
       const cust = matchCustomer(m.subject);
+      // Only classify if mail matches a known customer, otherwise unknown
+      const status = cust ? classify(m.subject) : 'un';
       return {
         id: m.id,
         subject: m.subject||'(kein Betreff)',
         sender: m.from?.emailAddress?.address||'–',
         date: m.receivedDateTime,
-        status: classify(m.subject),
+        status: status,
         custName: cust?.name||'–',
         custId: cust?.id||null,
         isMissing: false
