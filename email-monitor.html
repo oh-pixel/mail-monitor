@@ -68,7 +68,7 @@ select:focus{outline:none;border-color:var(--ac)}
 .sync-lbl{font-size:11px;color:var(--t3);font-family:var(--mono)}
 
 /* STAT CARDS */
-.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:22px}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:22px}
 .sc{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:16px 18px;position:relative;overflow:hidden}
 .sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0}
 .sc.c-tot::before{background:var(--ac)}
@@ -76,6 +76,7 @@ select:focus{outline:none;border-color:var(--ac)}
 .sc.c-wa::before{background:var(--wa)}
 .sc.c-er::before{background:var(--er)}
 .sc.c-mis::before{background:#a855f7}
+.sc.c-un::before{background:var(--t3)}
 .slbl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);margin-bottom:6px}
 .sval{font-size:28px;font-weight:300;font-family:var(--mono);letter-spacing:-.02em}
 .sc.c-tot .sval{color:var(--t1)}
@@ -83,6 +84,7 @@ select:focus{outline:none;border-color:var(--ac)}
 .sc.c-wa .sval{color:var(--wa)}
 .sc.c-er .sval{color:var(--er)}
 .sc.c-mis .sval{color:#a855f7}
+.sc.c-un .sval{color:var(--t2)}
 .ssub{font-size:10px;color:var(--t3);margin-top:3px}
 
 /* CHARTS */
@@ -264,6 +266,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
         <button class="ft wa" data-filter="wa" data-target="dash">Warnungen</button>
         <button class="ft er" data-filter="er" data-target="dash">Fehler</button>
         <button class="ft mis" data-filter="missing" data-target="dash">Fehlend</button>
+        <button class="ft" data-filter="un" data-target="dash">Unbekannt</button>
       </div>
       <span class="mcnt" id="dash-cnt">–</span>
     </div>
@@ -295,6 +298,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
         <button class="ft wa" data-filter="wa" data-target="mail">Warnungen</button>
         <button class="ft er" data-filter="er" data-target="mail">Fehler</button>
         <button class="ft mis" data-filter="missing" data-target="mail">Fehlend</button>
+        <button class="ft" data-filter="un" data-target="mail">Unbekannt</button>
       </div>
     </div>
     <input class="search-inp" type="text" placeholder="Betreff / Kunde suchen..." id="mail-search" oninput="renderMailList()">
@@ -706,8 +710,9 @@ function counts() {
   const wa=allMails.filter(m=>m.status==='wa').length;
   const er=allMails.filter(m=>m.status==='er').length;
   const mis=allMails.filter(m=>m.isMissing).length;
+  const un=allMails.filter(m=>m.status==='un'&&!m.isMissing).length;
   const total=allMails.filter(m=>!m.isMissing).length;
-  return {ok,wa,er,mis,total};
+  return {ok,wa,er,mis,un,total};
 }
 
 function renderStats() {
@@ -719,6 +724,7 @@ function renderStats() {
     <div class="sc c-wa"><div class="slbl">Warnungen</div><div class="sval">${c.wa}</div><div class="ssub">${pct(c.wa)}</div></div>
     <div class="sc c-er"><div class="slbl">Fehler</div><div class="sval">${c.er}</div><div class="ssub">${pct(c.er)}</div></div>
     <div class="sc c-mis"><div class="slbl">Fehlende E-Mails</div><div class="sval">${c.mis}</div><div class="ssub">${c.mis>0?'Nicht eingegangen':'Alle erhalten'}</div></div>
+    <div class="sc c-un"><div class="slbl">Unbekannt</div><div class="sval">${c.un}</div><div class="ssub">Kein passendes Keyword</div></div>
   `;
 }
 
@@ -733,8 +739,8 @@ function renderCharts() {
   donutChart = new Chart(ctx1.getContext('2d'),{
     type:'doughnut',
     data:{
-      labels:['Erfolgreich','Warnungen','Fehler','Fehlend'],
-      datasets:[{data:[c.ok,c.wa,c.er,c.mis],backgroundColor:['#22c55e','#f59e0b','#ef4444','#a855f7'],borderColor:'#18181b',borderWidth:3,hoverOffset:4}]
+      labels:['Erfolgreich','Warnungen','Fehler','Fehlend','Unbekannt'],
+      datasets:[{data:[c.ok,c.wa,c.er,c.mis,c.un],backgroundColor:['#22c55e','#f59e0b','#ef4444','#a855f7','#6b6b72'],borderColor:'#18181b',borderWidth:3,hoverOffset:4}]
     },
     options:{cutout:'70%',plugins:{legend:{labels:{color:'#6b6b72',font:{size:11},boxWidth:10,padding:12}},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw}`}}}}
   });
@@ -743,11 +749,12 @@ function renderCharts() {
   const buckets={};
   for(let i=days-1;i>=0;i--){
     const d=new Date(); d.setDate(d.getDate()-i);
-    buckets[d.toISOString().slice(0,10)]={ok:0,wa:0,er:0,mis:0};
+    buckets[d.toISOString().slice(0,10)]={ok:0,wa:0,er:0,mis:0,un:0};
   }
   allMails.forEach(m=>{
     const day=m.date.slice(0,10);
-    if(buckets[day]) buckets[day][m.status==='missing'?'mis':m.status]=(buckets[day][m.status==='missing'?'mis':m.status]||0)+1;
+    const bkey = m.status==='missing'?'mis': m.status==='un'?'un': m.status;
+    if(buckets[day]&&bkey in buckets[day]) buckets[day][bkey]++;
   });
   const lbls=Object.keys(buckets).map(d=>new Date(d).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'}));
 
@@ -759,7 +766,8 @@ function renderCharts() {
         {label:'Erfolgreich',data:Object.values(buckets).map(b=>b.ok),backgroundColor:'rgba(34,197,94,0.7)',borderRadius:2},
         {label:'Warnungen',data:Object.values(buckets).map(b=>b.wa),backgroundColor:'rgba(245,158,11,0.7)',borderRadius:2},
         {label:'Fehler',data:Object.values(buckets).map(b=>b.er),backgroundColor:'rgba(239,68,68,0.7)',borderRadius:2},
-        {label:'Fehlend',data:Object.values(buckets).map(b=>b.mis),backgroundColor:'rgba(168,85,247,0.7)',borderRadius:2}
+        {label:'Fehlend',data:Object.values(buckets).map(b=>b.mis),backgroundColor:'rgba(168,85,247,0.7)',borderRadius:2},
+        {label:'Unbekannt',data:Object.values(buckets).map(b=>b.un||0),backgroundColor:'rgba(107,107,114,0.7)',borderRadius:2}
       ]
     },
     options:{responsive:true,maintainAspectRatio:false,scales:{x:{stacked:true,ticks:{color:'#6b6b72',font:{size:10},maxTicksLimit:10},grid:{color:'rgba(255,255,255,0.04)'}},y:{stacked:true,ticks:{color:'#6b6b72',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}},plugins:{legend:{labels:{color:'#6b6b72',font:{size:11},boxWidth:10,padding:12}}}}
