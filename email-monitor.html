@@ -110,6 +110,7 @@ select:focus{outline:none;border-color:var(--ac)}
 .mrow{display:grid;grid-template-columns:8px 140px 1fr auto auto;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--b1);transition:background .1s}
 .mrow:last-child{border-bottom:none}
 .mrow:hover{background:var(--s2)}
+.mrow-cb{width:14px;height:14px;cursor:pointer;accent-color:var(--ac);flex-shrink:0}
 .mind{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .mind.ok{background:var(--ok)}
 .mind.wa{background:var(--wa)}
@@ -322,8 +323,12 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
     <input class="search-inp" type="text" placeholder="Betreff / Kunde suchen..." id="mail-search" oninput="renderMailList()">
   </div>
   <div class="mc">
-    <div class="mc-head" style="border-bottom:none;padding-bottom:0">
-      <span class="mcnt" id="mail-cnt">–</span>
+    <div class="mc-head">
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="checkbox" class="mrow-cb" id="mail-select-all" title="Alle auswählen" onclick="window.toggleSelectAll()">
+        <span class="mcnt" id="mail-cnt">–</span>
+      </div>
+      <button class="btn danger" id="btn-delete-selected" style="display:none;font-size:12px;padding:5px 12px" onclick="window.deleteSelectedMails()">Ausgewählte löschen</button>
     </div>
     <div id="mail-list"></div>
   </div>
@@ -915,7 +920,8 @@ function mailRow(m){
   const indCls = {ok:'ok',wa:'wa',er:'er',missing:'mis',un:'un'}[st]||'un';
   const badge = {ok:'<span class="mbadge b-ok">Erfolgreich</span>',wa:'<span class="mbadge b-wa">Warnung</span>',er:'<span class="mbadge b-er">Fehler</span>',missing:'<span class="mbadge b-mis">Fehlend</span>',un:'<span class="mbadge b-un">Unbekannt</span>'}[st]||'';
   const catBadges = (m.categories||[]).map(c => `<span style="padding:1px 6px;border-radius:10px;font-size:9px;background:var(--ac-d);color:var(--ac);margin-right:3px">${esc(c)}</span>`).join('');
-  return `<div class="mrow${m.isMissing?' mrow-miss':''}">
+  return `<div class="mrow${m.isMissing?' mrow-miss':''}" data-id="${esc(m.id)}">
+    <input type="checkbox" class="mrow-cb mail-cb" data-id="${esc(m.id)}" onclick="updateMailSelection()">
     <div class="mind ${indCls}"></div>
     <div class="mcust">${esc(m.custName)}</div>
     <div><div class="msubj">${esc(m.subject)}</div><div class="msend">${esc(m.sender)}${catBadges?' · '+catBadges:''}</div></div>
@@ -1658,6 +1664,40 @@ function deleteUnknownFromDB() {
   updateAll();
 }
 
+
+// ── MAIL SELECTION & DELETE ──
+function updateMailSelection() {
+  const cbs = document.querySelectorAll('#mail-list .mail-cb');
+  const checked = document.querySelectorAll('#mail-list .mail-cb:checked');
+  const btn = document.getElementById('btn-delete-selected');
+  const selectAll = document.getElementById('mail-select-all');
+  if (btn) btn.style.display = checked.length > 0 ? '' : 'none';
+  if (btn) btn.textContent = 'Ausgewählte löschen (' + checked.length + ')';
+  if (selectAll) selectAll.indeterminate = checked.length > 0 && checked.length < cbs.length;
+  if (selectAll) selectAll.checked = cbs.length > 0 && checked.length === cbs.length;
+}
+
+function toggleSelectAll() {
+  const selectAll = document.getElementById('mail-select-all');
+  const cbs = document.querySelectorAll('#mail-list .mail-cb');
+  cbs.forEach(cb => cb.checked = selectAll.checked);
+  updateMailSelection();
+}
+
+function deleteSelectedMails() {
+  const checked = document.querySelectorAll('#mail-list .mail-cb:checked');
+  if (!checked.length) return;
+  if (!confirm(checked.length + ' E-Mail(s) aus der Datenbank löschen?')) return;
+  const ids = new Set([...checked].map(cb => cb.dataset.id));
+  const db = getDB();
+  const filtered = db.filter(m => !ids.has(m.id));
+  saveDB(filtered);
+  // Also remove from allMails
+  allMails = allMails.filter(m => !ids.has(m.id));
+  toast(ids.size + ' E-Mail(s) gelöscht.', 'suc');
+  updateAll();
+}
+
 // ── TABS ──
 function showTab(name, el=null){
   ['dashboard','customers','mails','settings','db'].forEach(t=>{
@@ -1688,7 +1728,7 @@ window.showTab=showTab; window.setDashFilter=setDashFilter;
 window.setMailFilter=setMailFilter; window.renderMailList=renderMailList;
 window.openCustModal=openCustModal; window.closeCustModal=closeCustModal;
 window.saveCustomer=saveCustomer; window.deleteCustomer=deleteCustomer;
-window.saveSettings=saveSettings; window.loadSettings=loadSettings; window.deleteUnknownFromDB=deleteUnknownFromDB; window.updateCat=updateCat; window.deleteCat=deleteCat;
+window.saveSettings=saveSettings; window.loadSettings=loadSettings; window.deleteUnknownFromDB=deleteUnknownFromDB; window.toggleSelectAll=toggleSelectAll; window.deleteSelectedMails=deleteSelectedMails; window.updateMailSelection=updateMailSelection; window.updateCat=updateCat; window.deleteCat=deleteCat;
 window.updateRule=updateRule; window.deleteRule=deleteRule; window.addRule=addRule;
 
 
