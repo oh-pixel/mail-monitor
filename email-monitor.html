@@ -509,13 +509,15 @@ function classify(subject) {
   return 'un';
 }
 
-function matchCustomer(subject) {
+function matchCustomer(subject, sender) {
   const s = (subject||'').toLowerCase();
+  const snd = (sender||'').toLowerCase();
   const custs = getCustomers();
   return custs.find(c => {
     const nm = (c.name||'').toLowerCase();
     const al = (c.alias||'').toLowerCase();
-    return s.includes(nm) || (al && s.includes(al));
+    return s.includes(nm) || (al && s.includes(al))
+        || snd.includes(nm) || (al && snd.includes(al));
   }) || null;
 }
 
@@ -671,13 +673,15 @@ async function reload() {
     }
     const custs = getCustomers();
     allMails = raw.map(m => {
-      const cust = matchCustomer(m.subject);
+      const sender = m.from?.emailAddress?.address||'';
+      const senderName = m.from?.emailAddress?.name||'';
+      const cust = matchCustomer(m.subject, sender + ' ' + senderName);
       // Only classify if mail matches a known customer, otherwise unknown
       const status = cust ? classify(m.subject) : 'un';
       return {
         id: m.id,
         subject: m.subject||'(kein Betreff)',
-        sender: m.from?.emailAddress?.address||'–',
+        sender: sender||'–',
         date: m.receivedDateTime,
         status: status,
         custName: cust?.name||'–',
@@ -984,7 +988,7 @@ function saveCustomer(){
   closeCustModal();
   toast(editCustId?'Kunde aktualisiert.':'Kunde gespeichert.','suc');
   // Re-match mails
-  if(allMails.length) { allMails.forEach(m=>{ if(!m.isMissing){ const c=matchCustomer(m.subject); m.custName=c?.name||'–'; m.custId=c?.id||null; }}); }
+  if(allMails.length) { allMails.forEach(m=>{ if(!m.isMissing){ const c=matchCustomer(m.subject, m.sender); m.custName=c?.name||'–'; m.custId=c?.id||null; m.status=c?classify(m.subject):'un'; }}); }
   updateAll();
 }
 
