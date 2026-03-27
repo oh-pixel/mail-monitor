@@ -418,60 +418,37 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
 <div class="overlay" id="cust-overlay">
   <div class="modal">
     <h3 id="cust-modal-title">Kunde hinzufügen</h3>
-    <div class="two-col">
+    <div class="two-col" style="margin-bottom:12px">
       <div class="fg">
         <label>Kundenname *</label>
         <input type="text" id="c-name" placeholder="Musterfirma AG">
-        <div class="form-hint">Muss im Betreff vorkommen</div>
+        <div class="form-hint">Muss im Betreff oder Absender vorkommen</div>
       </div>
       <div class="fg">
         <label>Kürzel / Alias (optional)</label>
         <input type="text" id="c-alias" placeholder="MUSTER">
       </div>
     </div>
-    <div class="two-col">
-      <div class="fg">
-        <label>Erwartete E-Mails pro Zeitfenster *</label>
-        <input type="number" id="c-count" min="1" value="1">
-      </div>
-      <div class="fg">
-        <label>Zeitfenster</label>
-        <select id="c-window" style="width:100%">
-          <option value="day">Täglich</option>
-          <option value="week">Wöchentlich</option>
-          <option value="hour">Stündlich</option>
-        </select>
-      </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Notiz (optional)</label>
+      <textarea id="c-note" placeholder="z.B. Server in Rechenzentrum Chur..." rows="2"></textarea>
     </div>
-    <div class="fg" id="day-picker-wrap">
-      <label>An welchen Wochentagen erwartet? (leer = alle)</label>
-      <div class="days-grid">
-        <label class="day-cb"><input type="checkbox" name="wd" value="1"> Mo</label>
-        <label class="day-cb"><input type="checkbox" name="wd" value="2"> Di</label>
-        <label class="day-cb"><input type="checkbox" name="wd" value="3"> Mi</label>
-        <label class="day-cb"><input type="checkbox" name="wd" value="4"> Do</label>
-        <label class="day-cb"><input type="checkbox" name="wd" value="5"> Fr</label>
-        <label class="day-cb"><input type="checkbox" name="wd" value="6"> Sa</label>
-        <label class="day-cb"><input type="checkbox" name="wd" value="0"> So</label>
-      </div>
-    </div>
-    <div class="fg">
-      <label>Kategorien / Systeme</label>
-      <div id="cust-cat-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
-      <div class="form-hint">Welche Systeme werden bei diesem Kunden überwacht?</div>
-    </div>
-    <div class="fg">
+    <div class="fg" style="margin-bottom:6px">
       <label>Überwachung aktiv ab (Startdatum)</label>
       <input type="date" id="c-startdate" style="width:100%;padding:8px 11px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-family:var(--font);font-size:12px">
-      <div class="form-hint">Fehlende E-Mails werden erst ab diesem Datum gemeldet.</div>
     </div>
-    <div class="fg">
-      <label>Notiz (optional)</label>
-      <textarea id="c-note" placeholder="z.B. Backup läuft um 03:00 Uhr..."></textarea>
+
+    <div style="border-top:1px solid var(--b1);margin:16px 0 12px;padding-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:500;color:var(--t1)">Überwachungsregeln</div>
+        <button class="btn btn-sm" id="btn-add-rule" style="font-size:11px;padding:4px 10px">+ Regel hinzufügen</button>
+      </div>
+      <div id="c-rules-list" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
+
     <div class="mfooter">
       <button class="btn" id="btn-cancel-cust">Abbrechen</button>
-      <button class="btn danger" id="c-del-btn" id="c-del-btn" style="display:none">Löschen</button>
+      <button class="btn danger" id="c-del-btn" style="display:none">Löschen</button>
       <button class="btn prim" id="btn-save-cust">Speichern</button>
     </div>
   </div>
@@ -544,62 +521,69 @@ function buildMissingEntries(mails, days) {
 
   custs.forEach(c => {
     const name = c.name;
-    const window = c.window || 'day';
-    const expected = parseInt(c.count) || 1;
-    const workdays = (c.workdays||[]).map(Number);
     const startdate = c.startdate ? new Date(c.startdate) : null;
+    const rules = c.rules || [];
 
-    // Build time slots
-    const slots = [];
-    if (window === 'day') {
-      for (let i=0; i<days; i++) {
-        const d = new Date(now);
-        d.setDate(d.getDate()-i);
-        // Skip days before start date
-        if (startdate && d < startdate) continue;
-        const wd = d.getDay();
-        if (workdays.length===0 || workdays.includes(wd)) {
-          const dayStr = d.toISOString().slice(0,10);
-          // Only add past slots (not current day if <18:00)
-          if (i>0 || now.getHours()>=18) {
-            slots.push({key:dayStr, label:d.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'})});
+    rules.forEach(rule => {
+      const cats = getCategories();
+      const cat = cats.find(ct => ct.id === rule.catId);
+      const catName = cat ? cat.name : '';
+      const window = rule.window || 'day';
+      const expected = parseInt(rule.count) || 1;
+      const workdays = (rule.workdays||[]).map(Number);
+
+      const slots = [];
+      if (window === 'day') {
+        for (let i=0; i<days; i++) {
+          const d = new Date(now);
+          d.setDate(d.getDate()-i);
+          if (startdate && d < startdate) continue;
+          const wd = d.getDay();
+          if (workdays.length===0 || workdays.includes(wd)) {
+            const dayStr = d.toISOString().slice(0,10);
+            if (i>0 || now.getHours()>=18) {
+              slots.push({key:dayStr, label:d.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'})});
+            }
           }
         }
+      } else if (window === 'week') {
+        for (let i=0; i<Math.ceil(days/7); i++) {
+          const d = new Date(now);
+          d.setDate(d.getDate()-i*7);
+          const weekStart = new Date(d);
+          weekStart.setDate(d.getDate()-d.getDay());
+          if (startdate && weekStart < startdate) continue;
+          const key = 'w'+weekStart.toISOString().slice(0,10);
+          slots.push({key, label:'KW '+weekStart.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'})});
+        }
       }
-    } else if (window === 'week') {
-      // one slot per week
-      for (let i=0; i<Math.ceil(days/7); i++) {
-        const d = new Date(now);
-        d.setDate(d.getDate()-i*7);
-        const weekStart = new Date(d);
-        weekStart.setDate(d.getDate()-d.getDay());
-        const key = 'w'+weekStart.toISOString().slice(0,10);
-        slots.push({key, label:'KW '+weekStart.toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit'})});
-      }
-    }
 
-    slots.forEach(slot => {
-      let mailsInSlot;
-      if (window==='day') {
-        mailsInSlot = mails.filter(m => m.custId===c.id && m.date.slice(0,10)===slot.key);
-      } else {
-        const wStart = new Date(slot.key.slice(1));
-        const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate()+7);
-        mailsInSlot = mails.filter(m => m.custId===c.id && new Date(m.date)>=wStart && new Date(m.date)<wEnd);
-      }
-      const deficit = expected - mailsInSlot.length;
-      for (let d=0; d<deficit; d++) {
-        missing.push({
-          id: 'miss_'+c.id+'_'+slot.key+'_'+d,
-          subject: `[FEHLEND] ${name} – Erwartete E-Mail nicht eingegangen (${slot.label})`,
-          sender: '–',
-          date: slot.key+'T23:59:00Z',
-          status: 'missing',
-          custName: name,
-          custId: c.id,
-          isMissing: true
-        });
-      }
+      slots.forEach(slot => {
+        let mailsInSlot;
+        if (window==='day') {
+          mailsInSlot = mails.filter(m => m.custId===c.id && m.date.slice(0,10)===slot.key
+            && (!cat || (m.categories||[]).includes(catName)));
+        } else {
+          const wStart = new Date(slot.key.slice(1));
+          const wEnd = new Date(wStart); wEnd.setDate(wEnd.getDate()+7);
+          mailsInSlot = mails.filter(m => m.custId===c.id && new Date(m.date)>=wStart && new Date(m.date)<wEnd
+            && (!cat || (m.categories||[]).includes(catName)));
+        }
+        const deficit = expected - mailsInSlot.length;
+        for (let d=0; d<deficit; d++) {
+          missing.push({
+            id: 'miss_'+c.id+'_'+(rule.catId||'x')+'_'+slot.key+'_'+d,
+            subject: `[FEHLEND] ${name}${catName?' – '+catName:''} – Erwartete E-Mail nicht eingegangen (${slot.label})`,
+            sender: '–',
+            date: slot.key+'T23:59:00Z',
+            status: 'missing',
+            custName: name,
+            custId: c.id,
+            categories: catName ? [catName] : [],
+            isMissing: true
+          });
+        }
+      });
     });
   });
 
@@ -915,7 +899,7 @@ function renderCustomerGrid(){
       <div class="cc-top">
         <div>
           <div class="cc-name">${esc(c.name)}</div>
-          <div class="cc-kw">${c.count}× ${wlbl}${c.workdays?.length?' · '+formatDays(c.workdays):''}${c.startdate?' · ab '+c.startdate:''}</div>
+          <div class="cc-kw">${(c.rules||[]).length} Regel(n)${c.startdate?' · ab '+c.startdate:''}</div>
         </div>
         <div class="cc-status">
           ${dot}
@@ -985,17 +969,14 @@ function closeCustModal(){ document.getElementById('cust-overlay').classList.rem
 function saveCustomer(){
   const name=document.getElementById('c-name').value.trim();
   if(!name){ toast('Kundenname ist pflicht.','err'); return; }
-  const workdays=[...document.querySelectorAll('input[name=wd]:checked')].map(cb=>parseInt(cb.value));
+  const rules = getRulesFromForm();
   const data={
     id: editCustId||('c_'+Date.now()),
     name,
     alias:document.getElementById('c-alias').value.trim(),
-    count:parseInt(document.getElementById('c-count').value)||1,
-    window:document.getElementById('c-window').value,
-    workdays,
     note:document.getElementById('c-note').value.trim(),
     startdate:document.getElementById('c-startdate').value||new Date().toISOString().slice(0,10),
-    categories:getSelectedCats()
+    rules: rules
   };
   const custs=getCustomers();
   if(editCustId){
@@ -1043,6 +1024,78 @@ function saveSettings(){
 
 
 
+
+
+// ── REGELN PRO KUNDE ──
+function renderRulesList(rules) {
+  const cats = getCategories();
+  const list = document.getElementById('c-rules-list');
+  if (!list) return;
+
+  if (!rules || !rules.length) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--t3);padding:8px 0">Noch keine Regeln. Klicke auf «+ Regel hinzufügen».</div>';
+    return;
+  }
+
+  const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+  list.innerHTML = rules.map((r, i) => {
+    const catOptions = cats.map(c =>
+      `<option value="${c.id}" ${r.catId===c.id?'selected':''}>${esc(c.name)}</option>`
+    ).join('');
+
+    const dayChecks = [1,2,3,4,5,6,0].map(d =>
+      `<label style="display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9px;color:var(--t3);cursor:pointer">
+        <input type="checkbox" name="rule-wd-${i}" value="${d}" ${(r.workdays||[]).includes(d)?'checked':''} style="accent-color:var(--ac)">
+        ${dayNames[d]}
+      </label>`
+    ).join('');
+
+    return `<div style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:10px 12px">
+      <div style="display:grid;grid-template-columns:2fr 60px 1fr auto;gap:8px;align-items:center;margin-bottom:8px">
+        <select onchange="updateRule(${i},'catId',this.value)" style="padding:6px 9px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-size:11px">
+          <option value="">– Kategorie wählen –</option>
+          ${catOptions}
+        </select>
+        <input type="number" min="1" value="${r.count||1}" onchange="updateRule(${i},'count',parseInt(this.value))"
+          style="padding:6px 9px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-size:11px;text-align:center">
+        <select onchange="updateRule(${i},'window',this.value)" style="padding:6px 9px;background:var(--s1);border:1px solid var(--b2);border-radius:var(--r);color:var(--t1);font-size:11px">
+          <option value="day" ${r.window==='day'||!r.window?'selected':''}>× täglich</option>
+          <option value="week" ${r.window==='week'?'selected':''}>× wöchentlich</option>
+          <option value="hour" ${r.window==='hour'?'selected':''}>× stündlich</option>
+        </select>
+        <button onclick="deleteRule(${i})" style="background:none;border:none;color:var(--er);cursor:pointer;font-size:16px;padding:0 4px">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:10px;color:var(--t3)">Wochentage:</span>
+        ${dayChecks}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let currentRules = [];
+
+function addRule() {
+  currentRules.push({catId:'', count:1, window:'day', workdays:[]});
+  renderRulesList(currentRules);
+}
+
+function updateRule(idx, field, value) {
+  if (currentRules[idx]) currentRules[idx][field] = value;
+}
+
+function deleteRule(idx) {
+  currentRules.splice(idx, 1);
+  renderRulesList(currentRules);
+}
+
+function getRulesFromForm() {
+  currentRules.forEach((r, i) => {
+    r.workdays = [...document.querySelectorAll(`input[name="rule-wd-${i}"]:checked`)].map(cb => parseInt(cb.value));
+  });
+  return currentRules;
+}
 
 // ── KATEGORIEN ──
 const CAT_KEY = 'categories';
@@ -1439,7 +1492,7 @@ window.showTab=showTab; window.setDashFilter=setDashFilter;
 window.setMailFilter=setMailFilter; window.renderMailList=renderMailList;
 window.openCustModal=openCustModal; window.closeCustModal=closeCustModal;
 window.saveCustomer=saveCustomer; window.deleteCustomer=deleteCustomer;
-window.saveSettings=saveSettings; window.loadSettings=loadSettings; window.updateCat=updateCat; window.deleteCat=deleteCat; window.toggleCustCat=toggleCustCat;
+window.saveSettings=saveSettings; window.loadSettings=loadSettings; window.updateCat=updateCat; window.deleteCat=deleteCat; window.toggleCustCat=toggleCustCat; window.updateRule=updateRule; window.deleteRule=deleteRule; window.addRule=addRule;
 
 
 // Setup all event listeners after DOM ready
@@ -1469,6 +1522,7 @@ setTimeout(function setupEvents() {
   document.getElementById('btn-save-settings')?.addEventListener('click', function(){ saveSettings(); });
   document.getElementById('btn-reeval')?.addEventListener('click', function(){ reload(); });
   document.getElementById('btn-add-cat')?.addEventListener('click', function(){ addCat(); });
+  document.getElementById('btn-add-rule')?.addEventListener('click', function(){ addRule(); });
   document.getElementById('btn-save-gh')?.addEventListener('click', function(){ saveGHConfig(); });
   document.getElementById('btn-test-gh')?.addEventListener('click', function(){ testGHConnection(); });
 
