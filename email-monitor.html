@@ -899,23 +899,7 @@ function renderCustomerGrid(){
       <div class="cc-top">
         <div>
           <div class="cc-name">${esc(c.name)}</div>
-          <div class="cc-kw" style="margin-top:4px">
-            ${(()=>{
-              const cats = getCategories();
-              const rules = c.rules||[];
-              if(!rules.length) return '<span style="color:var(--t3)">Keine Regeln</span>';
-              return rules.map(r=>{
-                const cat = cats.find(ct=>ct.id===r.catId);
-                const wlbl = {day:'tägl.',week:'wöch.',hour:'stündl.'}[r.window||'day'];
-                const wds = (r.workdays||[]).length ? ['So','Mo','Di','Mi','Do','Fr','Sa'].filter((_,i)=>(r.workdays||[]).includes(i===0?0:i)).join(',') : 'alle Tage';
-                return \`<div style="display:flex;align-items:center;gap:5px;margin-top:3px">
-                  <span style="padding:2px 7px;border-radius:10px;font-size:9px;background:var(--ac-d);color:var(--ac)">\${cat?esc(cat.name):'–'}</span>
-                  <span style="font-size:9px;color:var(--t3)">\${r.count||1}× \${wlbl} · \${wds}</span>
-                </div>\`;
-              }).join('');
-            })()}
-            ${c.startdate?'<div style="font-size:9px;color:var(--t3);margin-top:3px">ab '+c.startdate+'</div>':''}
-          </div>
+          <div class="cc-kw" style="margin-top:4px" id="rules-${c.id}"></div>
         </div>
         <div class="cc-status">
           ${dot}
@@ -936,6 +920,33 @@ function renderCustomerGrid(){
       ${c.note?`<div style="margin-top:10px;font-size:10px;color:var(--t3);line-height:1.5">${esc(c.note)}</div>`:''}
     </div>`;
   }).join('');
+
+  // Populate rule badges after render
+  custs.forEach(c => {
+    const el = document.getElementById('rules-'+c.id);
+    if (!el) return;
+    const cats = getCategories();
+    const rules = c.rules||[];
+    if (!rules.length) {
+      el.innerHTML = '<span style="font-size:9px;color:var(--t3)">Keine Regeln definiert</span>';
+      return;
+    }
+    const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    el.innerHTML = rules.map(r => {
+      const cat = cats.find(ct => ct.id===r.catId);
+      const wlbl = {day:'tägl.',week:'wöch.',hour:'stündl.'}[r.window||'day'];
+      const wds = (r.workdays||[]).length
+        ? (r.workdays||[]).map(d => dayNames[d]).join(',')
+        : 'alle Tage';
+      return '<div style="display:flex;align-items:center;gap:5px;margin-top:3px">'
+        + '<span style="padding:2px 7px;border-radius:10px;font-size:9px;background:var(--ac-d);color:var(--ac)">'+(cat?esc(cat.name):'–')+'</span>'
+        + '<span style="font-size:9px;color:var(--t3)">'+(r.count||1)+'× '+wlbl+' · '+wds+'</span>'
+        + '</div>';
+    }).join('');
+    if (c.startdate) {
+      el.innerHTML += '<div style="font-size:9px;color:var(--t3);margin-top:3px">ab '+c.startdate+'</div>';
+    }
+  });
 }
 
 function formatDays(wds){
