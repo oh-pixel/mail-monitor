@@ -1088,6 +1088,8 @@ function saveCustomer(){
   // Re-match mails
   if(allMails.length) { allMails.forEach(m=>{ if(!m.isMissing){ const c=matchCustomer(m.subject, m.sender); m.custName=c?.name||'–'; m.custId=c?.id||null; m.status=c?classify(m.subject):'un'; }}); }
   updateAll();
+  // Auto-sync after save
+  setTimeout(() => reload(), 1000);
 }
 
 function deleteCustomer(){
@@ -1123,6 +1125,8 @@ function saveSettings(){
   const categories = getCategories();
   saveSettingsToGH({kw_ok, kw_wa, kw_er, categories});
   toast('Einstellungen gespeichert.','suc');
+  // Auto-sync after save
+  setTimeout(() => reload(), 1000);
 }
 
 
@@ -1219,6 +1223,8 @@ function saveCategories(cats) {
     kw_er: LS.get('kw_er') || '',
     categories: cats
   });
+  // Auto-sync after category change
+  setTimeout(() => reload(), 1000);
 }
 
 function renderCatList() {
