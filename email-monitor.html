@@ -1065,8 +1065,12 @@ function closeCustModal(){ document.getElementById('cust-overlay').classList.rem
 
 function saveCustomer(){
   const name=document.getElementById('c-name').value.trim();
-  if(!name){ toast('Kundenname ist pflicht.','err'); return; }
+  if(!name){ toast('Kundenname ist Pflicht.','err'); return; }
   const rules = getRulesFromForm();
+  // Validate: at least one rule with a category
+  if(!rules.length){ toast('Mindestens eine Überwachungsregel ist Pflicht.','err'); return; }
+  const hasCategory = rules.every(r => r.catId && r.catId !== '');
+  if(!hasCategory){ toast('Jede Regel benötigt eine Kategorie.','err'); return; }
   const data={
     id: editCustId||('c_'+Date.now()),
     name,
