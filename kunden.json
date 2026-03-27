@@ -1,0 +1,19 @@
+[
+  {
+    "id": "c_1774599092510",
+    "name": "Garage Raschle GmbH",
+    "alias": "",
+    "count": 1,
+    "window": "day",
+    "workdays": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      0
+    ],
+    "note": ""
+  }
+]
