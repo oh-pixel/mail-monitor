@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mail Monitor v1.3</title>
+<title>Mail Monitor v1.3.1</title>
 <script src="msal-browser.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <style>
@@ -206,7 +206,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
   <div class="hright">
     <div style="display:flex;flex-direction:column;align-items:flex-end;margin-right:12px">
       <span style="font-size:13px;font-weight:500;color:var(--t1);letter-spacing:-0.01em">Mail Monitor</span>
-      <span style="font-size:10px;color:var(--t3)">v1.3</span>
+      <span style="font-size:10px;color:var(--t3)">v1.3.1</span>
     </div>
     <div class="upill" id="upill" style="display:none"><div class="udot"></div><span id="uname">–</span></div>
     <button class="btn" id="btn-cfg" data-tab="'settings')" style="display:none">Einstellungen</button>
@@ -548,6 +548,23 @@ function buildMissingEntries(mails, days) {
       const expected = parseInt(rule.count) || 1;
       const workdays = (rule.workdays||[]).map(Number);
 
+      // Find last received mail for this customer+category
+      const custCatMails = mails.filter(m =>
+        m.custId === c.id && !m.isMissing &&
+        (!cat || (m.categories||[]).includes(catName))
+      ).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+      const lastMailDate = custCatMails.length > 0
+        ? new Date(custCatMails[0].date)
+        : null;
+
+      // Reference date: last mail OR startdate OR now
+      const refDate = lastMailDate || startdate || now;
+
+      // Only show missing if 24h have passed since reference date
+      const hoursSinceRef = (now - refDate) / (1000 * 60 * 60);
+      if (hoursSinceRef < 24) return; // Not yet 24h – no missing entry
+
       const slots = [];
       if (window === 'day') {
         for (let i=0; i<days; i++) {
@@ -639,6 +656,14 @@ async function onLogin(acc) {
   document.getElementById('uname').textContent = acc.username||acc.name;
   loadSettings();
   showTab('dashboard');
+
+  // Load settings from GitHub if configured
+  const ghSettings = await loadSettingsFromGH();
+  if (ghSettings) {
+    if (ghSettings.kw_ok) LS.set('kw_ok', ghSettings.kw_ok);
+    if (ghSettings.kw_wa) LS.set('kw_wa', ghSettings.kw_wa);
+    if (ghSettings.kw_er) LS.set('kw_er', ghSettings.kw_er);
+  }
 
   // Load customers from GitHub if configured
   const ghCustomers = await loadCustomersFromGH();
@@ -1067,9 +1092,14 @@ function loadSettings(){
 }
 
 function saveSettings(){
-  LS.set('kw_ok', document.getElementById('s-ok').value);
-  LS.set('kw_wa', document.getElementById('s-wa').value);
-  LS.set('kw_er', document.getElementById('s-er').value);
+  const kw_ok = document.getElementById('s-ok').value;
+  const kw_wa = document.getElementById('s-wa').value;
+  const kw_er = document.getElementById('s-er').value;
+  LS.set('kw_ok', kw_ok);
+  LS.set('kw_wa', kw_wa);
+  LS.set('kw_er', kw_er);
+  // Save to GitHub
+  saveSettingsToGH({kw_ok, kw_wa, kw_er});
   toast('Einstellungen gespeichert.','suc');
 }
 
@@ -1236,6 +1266,56 @@ function toggleCustCat(el) {
 
 function getSelectedCats() {
   return [...document.querySelectorAll('#cust-cat-list .cat-pill.selected')].map(el => el.dataset.catid);
+}
+
+
+// ── EINSTELLUNGEN AUF GITHUB ──
+async function loadSettingsFromGH() {
+  const {token, repo} = getGHConfig();
+  if (!token || !repo) return null;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/einstellungen.json`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) return null;
+    const data = await res.json();
+    const decoded = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
+    return JSON.parse(decoded);
+  } catch(e) {
+    console.error('GH settings load error:', e);
+    return null;
+  }
+}
+
+async function saveSettingsToGH(settings) {
+  const {token, repo} = getGHConfig();
+  if (!token || !repo) return;
+  try {
+    let sha = null;
+    const check = await fetch(`https://api.github.com/repos/${repo}/contents/einstellungen.json`, {
+      headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (check.ok) sha = (await check.json()).sha;
+
+    const body = {
+      message: 'Einstellungen aktualisiert via Mail Monitor',
+      content: btoa(unescape(encodeURIComponent(JSON.stringify(settings, null, 2))))
+    };
+    if (sha) body.sha = sha;
+
+    await fetch(`https://api.github.com/repos/${repo}/contents/einstellungen.json`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+  } catch(e) {
+    console.error('GH settings save error:', e);
+  }
 }
 
 // ── GITHUB KUNDEN-SYNC ──
