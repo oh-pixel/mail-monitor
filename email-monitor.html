@@ -212,7 +212,7 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
   <button class="ntab active" id="nav-dashboard">Dashboard</button>
   <button class="ntab" id="nav-customers">Kunden <span class="nbadge" id="miss-badge" style="display:none">0</span></button>
   <button class="ntab" id="nav-mails">E-Mails</button>
-  <button class="ntab" id="nav-db">Datenbank <span class="nbadge" id="db-badge" style="display:none;background:rgba(99,102,241,0.15);color:#6366f1">0</span></button>
+  <button class="ntab" id="nav-db">Datenbank</button>
   <button class="ntab" id="nav-settings">Einstellungen</button>
 </div>
 
@@ -1486,12 +1486,7 @@ function setAutoSync(minutes) {
 }
 
 function updateDBBadge() {
-  const db = getDB();
-  const badge = document.getElementById('db-badge');
-  if (badge) {
-    badge.textContent = db.length;
-    badge.style.display = db.length > 0 ? '' : 'none';
-  }
+  // Badge removed by user preference
 }
 
 function renderDBView() {
