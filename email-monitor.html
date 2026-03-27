@@ -949,6 +949,22 @@ function renderCustomerGrid(){
     const er=custMails.filter(m=>m.status==='er').length;
     const hasMiss=missMails.length>0;
     const hasErr=er>0;
+
+    // Calculate expected OK count from rules (today's rules)
+    const cats = getCategories();
+    const today = new Date();
+    const todayWd = today.getDay();
+    const startdate = c.startdate ? new Date(c.startdate) : null;
+    const startOk = !startdate || today >= startdate;
+    let expectedOk = 0;
+    (c.rules||[]).forEach(r => {
+      if (r.window !== 'day' && r.window !== 'hour') return;
+      const wds = (r.workdays||[]).map(Number);
+      if (wds.length === 0 || wds.includes(todayWd)) {
+        if (startOk) expectedOk += parseInt(r.count)||1;
+      }
+    });
+    const okDisplay = expectedOk > 0 ? ok + '/' + expectedOk : ok;
     const wlbl={day:'täglich',week:'wöchentlich',hour:'stündlich'}[c.window||'day'];
     const lastMail=custMails[0];
     const lastDate=lastMail?new Date(lastMail.date).toLocaleDateString('de-CH',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'–';
@@ -967,7 +983,7 @@ function renderCustomerGrid(){
         </div>
       </div>
       <div class="cc-stats">
-        <div class="cc-stat"><div class="cc-stat-val" style="color:var(--ok)">${ok}</div><div class="cc-stat-lbl">OK</div></div>
+        <div class="cc-stat"><div class="cc-stat-val" style="color:var(--ok);font-size:${expectedOk>0?'14px':'16px'}">${okDisplay}</div><div class="cc-stat-lbl">OK</div></div>
         <div class="cc-stat"><div class="cc-stat-val" style="color:var(--wa)">${wa}</div><div class="cc-stat-lbl">Warn</div></div>
         <div class="cc-stat"><div class="cc-stat-val" style="color:var(--er)">${er}</div><div class="cc-stat-lbl">Fehler</div></div>
       </div>
