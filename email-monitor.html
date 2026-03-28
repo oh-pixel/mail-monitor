@@ -212,7 +212,6 @@ textarea{resize:vertical;min-height:70px;line-height:1.6}
     <div class="upill" id="upill" style="display:none"><div class="udot"></div><span id="uname">–</span></div>
     <button class="btn" id="btn-cfg" data-tab="'settings')" style="display:none">Einstellungen</button>
     <button class="btn" id="btn-logout" id="btn-logout-el" style="display:none">Abmelden</button>
-    <a class="btn" id="btn-back-hub" href="https://oh-pixel.github.io/control-hub/" style="display:none;text-decoration:none;">← ControlHub</a>
   </div>
 </div>
 
@@ -655,7 +654,6 @@ async function onLogin(acc) {
   document.getElementById('upill').style.display='flex';
   document.getElementById('btn-cfg').style.display='';
   document.getElementById('btn-logout').style.display='';
-  document.getElementById('btn-back-hub').style.display='';
   document.getElementById('uname').textContent = acc.username||acc.name;
   loadSettings();
   showTab('dashboard');
@@ -754,8 +752,9 @@ async function reload() {
 
     // Merge with DB so deleted mails from inbox still show
     const db = getDB();
+    const bl = getBlacklist();
     const graphIds = new Set(allMails.map(m => m.id));
-    const dbOnlyMails = db.filter(m => !graphIds.has(m.id) && !m.isMissing);
+    const dbOnlyMails = db.filter(m => !graphIds.has(m.id) && !m.isMissing && !bl.has(m.id));
     const mergedMails = [...allMails, ...dbOnlyMails];
 
     // Add missing entries
@@ -1558,13 +1557,16 @@ async function saveDBToGH(mails) {
 
 function syncNewMails(mailsFromGraph) {
   const db = getDB();
-  const existingIds = new Set(db.map(m => m.id));
-  const newMails = mailsFromGraph.filter(m => !m.isMissing && !existingIds.has(m.id));
+  const bl = getBlacklist();
+  // Filter blacklisted from DB too
+  const cleanDB = db.filter(m => !bl.has(m.id));
+  const existingIds = new Set(cleanDB.map(m => m.id));
+  const newMails = mailsFromGraph.filter(m => !m.isMissing && !existingIds.has(m.id) && !bl.has(m.id));
   if (newMails.length === 0) {
     toast('Keine neuen E-Mails gefunden.', 'suc');
-    return db;
+    return cleanDB;
   }
-  const merged = [...newMails, ...db];
+  const merged = [...newMails, ...cleanDB];
   const saved = saveDB(merged);
   toast(newMails.length + ' neue E-Mail(s) gespeichert.', 'suc');
   return saved;
@@ -1572,9 +1574,12 @@ function syncNewMails(mailsFromGraph) {
 
 function fullSyncMails(mailsFromGraph) {
   const db = getDB();
-  const existingIds = new Set(db.map(m => m.id));
-  const newMails = mailsFromGraph.filter(m => !m.isMissing && !existingIds.has(m.id));
-  const merged = [...newMails, ...db];
+  const bl = getBlacklist();
+  // Filter blacklisted from DB too
+  const cleanDB = db.filter(m => !bl.has(m.id));
+  const existingIds = new Set(cleanDB.map(m => m.id));
+  const newMails = mailsFromGraph.filter(m => !m.isMissing && !existingIds.has(m.id) && !bl.has(m.id));
+  const merged = [...newMails, ...cleanDB];
   const saved = saveDB(merged);
   toast(newMails.length + ' neue + ' + (saved.length - newMails.length) + ' bestehende E-Mails.', 'suc');
   return saved;
@@ -1708,12 +1713,16 @@ function setDBFilter(f, el) {
 function deleteUnknownFromDB() {
   const db = getDB();
   const before = db.length;
+  const toDelete = db.filter(m => m.status === 'un');
   const filtered = db.filter(m => m.status !== 'un');
   const removed = before - filtered.length;
   if (removed === 0) { toast('Keine unbekannten E-Mails in der Datenbank.', 'suc'); return; }
-  if (!confirm(removed + ' unbekannte E-Mail(s) aus der Datenbank löschen?')) return;
+  if (!confirm(removed + ' unbekannte E-Mail(s) dauerhaft löschen?')) return;
+  // Add to blacklist so they don't reappear
+  addToBlacklist(toDelete.map(m => m.id));
   saveDB(filtered);
-  toast(removed + ' unbekannte E-Mail(s) gelöscht.', 'suc');
+  allMails = allMails.filter(m => m.status !== 'un' || m.isMissing);
+  toast(removed + ' unbekannte E-Mail(s) dauerhaft gelöscht.', 'suc');
   renderDBView();
   updateAll();
 }
