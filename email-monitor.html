@@ -752,7 +752,6 @@ async function reload() {
 
     // Merge with DB so deleted mails from inbox still show
     const db = getDB();
-    const bl = getBlacklist();
     const graphIds = new Set(allMails.map(m => m.id));
     const dbOnlyMails = db.filter(m => !graphIds.has(m.id) && !m.isMissing && !bl.has(m.id));
     const mergedMails = [...allMails, ...dbOnlyMails];
@@ -1557,11 +1556,11 @@ async function saveDBToGH(mails) {
 
 function syncNewMails(mailsFromGraph) {
   const db = getDB();
-  const bl = getBlacklist();
+  const blSync = getBlacklist();
   // Filter blacklisted from DB too
-  const cleanDB = db.filter(m => !bl.has(m.id));
+  const cleanDB = db.filter(m => !blSync.has(m.id));
   const existingIds = new Set(cleanDB.map(m => m.id));
-  const newMails = mailsFromGraph.filter(m => !m.isMissing && !existingIds.has(m.id) && !bl.has(m.id));
+  const newMails = mailsFromGraph.filter(m => !m.isMissing && !existingIds.has(m.id) && !blSync.has(m.id));
   if (newMails.length === 0) {
     toast('Keine neuen E-Mails gefunden.', 'suc');
     return cleanDB;
@@ -1574,11 +1573,11 @@ function syncNewMails(mailsFromGraph) {
 
 function fullSyncMails(mailsFromGraph) {
   const db = getDB();
-  const bl = getBlacklist();
+  const blFull = getBlacklist();
   // Filter blacklisted from DB too
-  const cleanDB = db.filter(m => !bl.has(m.id));
+  const cleanDB = db.filter(m => !blFull.has(m.id));
   const existingIds = new Set(cleanDB.map(m => m.id));
-  const newMails = mailsFromGraph.filter(m => !m.isMissing && !existingIds.has(m.id) && !bl.has(m.id));
+  const newMails = mailsFromGraph.filter(m => !m.isMissing && !existingIds.has(m.id) && !blFull.has(m.id));
   const merged = [...newMails, ...cleanDB];
   const saved = saveDB(merged);
   toast(newMails.length + ' neue + ' + (saved.length - newMails.length) + ' bestehende E-Mails.', 'suc');
